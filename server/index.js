@@ -48,7 +48,6 @@ app.get("/", (req, res) => {
   `);
 });
 
-
 app.use(express.static("public"));
 app.use(express.json());
 app.use(session({ secret: "fc26", resave: false, saveUninitialized: false }));
