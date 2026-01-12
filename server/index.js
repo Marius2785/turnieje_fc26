@@ -1,4 +1,5 @@
-const express = require("express");
+import express from "express";
+
 const app = express();
 
 // ===== STRONA GŁÓWNA =====
@@ -59,12 +60,12 @@ app.get("/", (req, res) => {
   `);
 });
 
-// ===== PLACEHOLDER POD DISCORD (NA RAZIE) =====
+// ===== TYMCZASOWY PLACEHOLDER =====
 app.get("/auth/discord", (req, res) => {
-  res.send("Discord login będzie tu podpięty w kolejnym kroku.");
+  res.send("Logowanie Discord będzie dodane w następnym kroku.");
 });
 
-// ===== START SERWERA =====
+// ===== START =====
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("ONLINE");
