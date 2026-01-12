@@ -1,72 +1,102 @@
 import express from "express";
+import session from "express-session";
+import fetch from "node-fetch";
 
 const app = express();
 
-// ===== STRONA GŁÓWNA =====
+/* ====== KONFIG ====== */
+const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+const CALLBACK_URL = "https://turnieje-fc26.onrender.com/auth/discord/callback";
+
+const ADMINS = [
+  "878644549579341834",
+  "1110642941875191880"
+];
+
+/* ====== SESJA ====== */
+app.use(
+  session({
+    secret: "fc26-secret",
+    resave: false,
+    saveUninitialized: false
+  })
+);
+
+/* ====== STRONA GŁÓWNA ====== */
 app.get("/", (req, res) => {
+  if (!req.session.user) {
+    return res.send(`
+      <h1>Turnieje FC 26</h1>
+      <p>Wirtualne obstawianie meczów (4fun)</p>
+      <a href="/auth/discord">Zaloguj przez Discord</a>
+    `);
+  }
+
+  const user = req.session.user;
+  const isAdmin = ADMINS.includes(user.id);
+
   res.send(`
-    <!DOCTYPE html>
-    <html lang="pl">
-    <head>
-      <meta charset="UTF-8" />
-      <title>Turnieje FC 26</title>
-      <style>
-        body {
-          background: #0f172a;
-          color: white;
-          font-family: Arial, sans-serif;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
-          margin: 0;
-        }
-        .box {
-          text-align: center;
-          background: #020617;
-          padding: 40px;
-          border-radius: 14px;
-          box-shadow: 0 0 30px rgba(0,0,0,.6);
-        }
-        h1 {
-          margin-bottom: 10px;
-        }
-        p {
-          opacity: 0.8;
-        }
-        a {
-          display: inline-block;
-          margin-top: 25px;
-          padding: 14px 28px;
-          background: #2563eb;
-          color: white;
-          text-decoration: none;
-          border-radius: 10px;
-          font-size: 18px;
-        }
-        a:hover {
-          background: #1d4ed8;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="box">
-        <h1>Turnieje FC 26</h1>
-        <p>Wirtualne obstawianie meczów (4fun)</p>
-        <a href="/auth/discord">Zaloguj przez Discord</a>
-      </div>
-    </body>
-    </html>
+    <h1>Witaj ${user.username}</h1>
+    <p>Saldo: 1000 💰</p>
+    ${isAdmin ? "<p><b>Panel admina AKTYWNY</b></p>" : ""}
+    <a href="/logout">Wyloguj</a>
   `);
 });
 
-// ===== TYMCZASOWY PLACEHOLDER =====
+/* ====== START LOGOWANIA ====== */
 app.get("/auth/discord", (req, res) => {
-  res.send("Logowanie Discord będzie dodane w następnym kroku.");
+  const url =
+    `https://discord.com/api/oauth2/authorize` +
+    `?client_id=${CLIENT_ID}` +
+    `&redirect_uri=${encodeURIComponent(CALLBACK_URL)}` +
+    `&response_type=code&scope=identify`;
+
+  res.redirect(url);
 });
 
-// ===== START =====
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("ONLINE");
+/* ====== CALLBACK ====== */
+app.get("/auth/discord/callback", async (req, res) => {
+  const code = req.query.code;
+  if (!code) return res.send("Brak kodu Discord");
+
+  const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: CALLBACK_URL
+    })
+  });
+
+  const tokenData = await tokenRes.json();
+
+  const userRes = await fetch("https://discord.com/api/users/@me", {
+    headers: {
+      Authorization: `Bearer ${tokenData.access_token}`
+    }
+  });
+
+  const user = await userRes.json();
+
+  req.session.user = {
+    id: user.id,
+    username: user.username
+  };
+
+  res.redirect("/");
 });
+
+/* ====== WYLOGUJ ====== */
+app.get("/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.redirect("/");
+  });
+});
+
+/* ====== START ====== */
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("ONLINE"));
