@@ -1,8 +1,16 @@
 import express from "express";
 import session from "express-session";
 import fetch from "node-fetch";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
+
+/* ====== STATIC FILES ====== */
+app.use(express.static(path.join(__dirname, "public")));
 
 /* ====== KONFIG ====== */
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
@@ -26,11 +34,7 @@ app.use(
 /* ====== STRONA GŁÓWNA ====== */
 app.get("/", (req, res) => {
   if (!req.session.user) {
-    return res.send(`
-      <h1>Turnieje FC 26</h1>
-      <p>Wirtualne obstawianie meczów (4fun)</p>
-      <a href="/auth/discord">Zaloguj przez Discord</a>
-    `);
+    return res.sendFile(path.join(__dirname, "public", "index.html"));
   }
 
   const user = req.session.user;
