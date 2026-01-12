@@ -1,65 +1,71 @@
-import express from "express";
-import session from "express-session";
-import passport from "passport";
-import "./auth.js";
-import "./db.js";
-
+const express = require("express");
 const app = express();
 
+// ===== STRONA GŁÓWNA =====
 app.get("/", (req, res) => {
   res.send(`
-    <html>
-      <head>
-        <title>Turnieje FC 26</title>
-        <style>
-          body {
-            background: #0f172a;
-            color: white;
-            font-family: Arial;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-          }
-          .box {
-            text-align: center;
-          }
-          a {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 12px 24px;
-            background: #2563eb;
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-size: 18px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="box">
-          <h1>Turnieje FC 26</h1>
-          <p>Wirtualne obstawianie meczów</p>
-          <a href="/auth/discord">Zaloguj przez Discord</a>
-        </div>
-      </body>
+    <!DOCTYPE html>
+    <html lang="pl">
+    <head>
+      <meta charset="UTF-8" />
+      <title>Turnieje FC 26</title>
+      <style>
+        body {
+          background: #0f172a;
+          color: white;
+          font-family: Arial, sans-serif;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          margin: 0;
+        }
+        .box {
+          text-align: center;
+          background: #020617;
+          padding: 40px;
+          border-radius: 14px;
+          box-shadow: 0 0 30px rgba(0,0,0,.6);
+        }
+        h1 {
+          margin-bottom: 10px;
+        }
+        p {
+          opacity: 0.8;
+        }
+        a {
+          display: inline-block;
+          margin-top: 25px;
+          padding: 14px 28px;
+          background: #2563eb;
+          color: white;
+          text-decoration: none;
+          border-radius: 10px;
+          font-size: 18px;
+        }
+        a:hover {
+          background: #1d4ed8;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="box">
+        <h1>Turnieje FC 26</h1>
+        <p>Wirtualne obstawianie meczów (4fun)</p>
+        <a href="/auth/discord">Zaloguj przez Discord</a>
+      </div>
+    </body>
     </html>
   `);
 });
 
-app.use(express.static("public"));
-app.use(express.json());
-app.use(session({ secret: "fc26", resave: false, saveUninitialized: false }));
-app.use(passport.initialize());
-app.use(passport.session());
+// ===== PLACEHOLDER POD DISCORD (NA RAZIE) =====
+app.get("/auth/discord", (req, res) => {
+  res.send("Discord login będzie tu podpięty w kolejnym kroku.");
+});
 
-app.get("/auth/discord", passport.authenticate("discord"));
-app.get("/auth/discord/callback",
-  passport.authenticate("discord", { failureRedirect: "/" }),
-  (req, res) => res.redirect("/")
-);
-
-app.get("/api/me", (req,res)=>res.json(req.user||null));
-
-app.listen(3000, () => console.log("ONLINE"));
+// ===== START SERWERA =====
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("ONLINE");
+});
