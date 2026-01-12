@@ -4,10 +4,14 @@ import fetch from "node-fetch";
 import path from "path";
 import { fileURLToPath } from "url";
 
+/* ====== PATH ====== */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+/* ====== RENDER / HTTPS FIX (BARDZO WAŻNE) ====== */
+app.set("trust proxy", 1);
 
 /* ====== STATIC FILES ====== */
 app.use(express.static(path.join(__dirname, "public")));
@@ -15,19 +19,25 @@ app.use(express.static(path.join(__dirname, "public")));
 /* ====== KONFIG ====== */
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const CALLBACK_URL = "https://turnieje-fc26.onrender.com/auth/discord/callback";
+const CALLBACK_URL =
+  "https://turnieje-fc26.onrender.com/auth/discord/callback";
 
 const ADMINS = [
   "878644549579341834",
   "1110642941875191880"
 ];
 
-/* ====== SESJA ====== */
+/* ====== SESJA (POPRAWIONA POD RENDER) ====== */
 app.use(
   session({
+    name: "fc26.sid",
     secret: "fc26-secret",
     resave: false,
-    saveUninitialized: false
+    saveUninitialized: false,
+    cookie: {
+      secure: true,
+      sameSite: "none"
+    }
   })
 );
 
@@ -41,10 +51,22 @@ app.get("/", (req, res) => {
   const isAdmin = ADMINS.includes(user.id);
 
   res.send(`
-    <h1>Witaj ${user.username}</h1>
-    <p>Saldo: 1000 💰</p>
-    ${isAdmin ? "<p><b>Panel admina AKTYWNY</b></p>" : ""}
-    <a href="/logout">Wyloguj</a>
+    <!DOCTYPE html>
+    <html lang="pl">
+    <head>
+      <meta charset="UTF-8" />
+      <title>Turnieje FC 26</title>
+      <link rel="stylesheet" href="/style.css" />
+    </head>
+    <body>
+      <div class="card">
+        <h1>Witaj ${user.username}</h1>
+        <p>Saldo: 1000 💰</p>
+        ${isAdmin ? "<p><b>Panel admina AKTYWNY</b></p>" : ""}
+        <a class="btn" href="/logout">Wyloguj</a>
+      </div>
+    </body>
+    </html>
   `);
 });
 
