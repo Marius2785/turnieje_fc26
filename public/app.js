@@ -1,57 +1,58 @@
-const app = document.getElementById("app");
+document.addEventListener("DOMContentLoaded", () => {
+  const loginForm = document.getElementById("login-form");
+  const registerForm = document.getElementById("register-form");
+  const logoutBtn = document.getElementById("logout");
 
-async function checkLogin() {
-  const res = await fetch("/api/me");
-  const data = await res.json();
+  if (loginForm) {
+    loginForm.addEventListener("submit", async e => {
+      e.preventDefault();
 
-  if (!data.logged) {
-    showLogin();
-  } else {
-    showPanel(data);
-  }
-}
+      const login = document.getElementById("login").value;
+      const password = document.getElementById("password").value;
 
-function showLogin() {
-  app.innerHTML = `
-    <h1>Turnieje FC 26</h1>
-    <input id="login" placeholder="Login">
-    <input id="password" type="password" placeholder="Hasło">
-    <button onclick="login()">Zaloguj</button>
-    <p id="error"></p>
-  `;
-}
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ login, password })
+      });
 
-async function login() {
-  const login = document.getElementById("login").value;
-  const password = document.getElementById("password").value;
+      const data = await res.json();
 
-  const res = await fetch("/api/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ login, password })
-  });
-
-  if (!res.ok) {
-    document.getElementById("error").innerText = "Błędne dane";
-    return;
+      if (!res.ok) {
+        alert(data.error || "Błąd logowania");
+      } else {
+        location.reload();
+      }
+    });
   }
 
-  checkLogin();
-}
+  if (registerForm) {
+    registerForm.addEventListener("submit", async e => {
+      e.preventDefault();
 
-function showPanel(user) {
-  app.innerHTML = `
-    <h1>Witaj ${user.login}</h1>
-    <p>Saldo: 1000 💰</p>
-    ${user.admin ? "<b>PANEL ADMINA</b>" : ""}
-    <br><br>
-    <button onclick="logout()">Wyloguj</button>
-  `;
-}
+      const login = document.getElementById("reg-login").value;
+      const password = document.getElementById("reg-password").value;
 
-async function logout() {
-  await fetch("/api/logout", { method: "POST" });
-  checkLogin();
-}
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ login, password })
+      });
 
-checkLogin();
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Błąd rejestracji");
+      } else {
+        alert("Konto utworzone – możesz się zalogować");
+      }
+    });
+  }
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async () => {
+      await fetch("/api/logout", { method: "POST" });
+      location.reload();
+    });
+  }
+});
