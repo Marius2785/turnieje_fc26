@@ -18,7 +18,7 @@ let matchId = 1;
 
 /* ===== MIDDLEWARE ===== */
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // 🔴 TO BYŁ BRAK
+app.use(express.urlencoded({ extended: true }));
 app.use(
   session({
     secret: "fc26-secret",
@@ -30,9 +30,17 @@ app.use(
 /* ===== STATIC ===== */
 app.use(express.static(path.join(__dirname, "../public")));
 
+/* ===== POMOCNICZE ===== */
+function getLoginAndPassword(body) {
+  return {
+    login: body.login || body.username || body.user,
+    password: body.password || body.haslo || body.pass
+  };
+}
+
 /* ===== AUTH ===== */
 app.post("/api/register", (req, res) => {
-  const { login, password } = req.body;
+  const { login, password } = getLoginAndPassword(req.body);
 
   if (!login || !password) {
     return res.status(400).json({ error: "Brak danych" });
@@ -47,7 +55,7 @@ app.post("/api/register", (req, res) => {
 });
 
 app.post("/api/login", (req, res) => {
-  const { login, password } = req.body;
+  const { login, password } = getLoginAndPassword(req.body);
 
   const user = users.find(
     u => u.login === login && u.password === password
@@ -84,26 +92,6 @@ app.get("/api/matches", (req, res) => {
   res.json(matches);
 });
 
-app.post("/api/bet", (req, res) => {
-  const user = users.find(u => u.login === req.session.user);
-  if (!user) return res.status(401).json({ error: "Nie zalogowany" });
-
-  const { matchId, team, amount } = req.body;
-  const match = matches.find(m => m.id === Number(matchId));
-
-  if (!match || match.status !== "open") {
-    return res.status(400).json({ error: "Mecz niedostępny" });
-  }
-
-  if (user.saldo < amount) {
-    return res.status(400).json({ error: "Brak środków" });
-  }
-
-  user.saldo -= Number(amount);
-  bets.push({ user: user.login, matchId: match.id, team, amount: Number(amount) });
-  res.json({ ok: true });
-});
-
 /* ===== ADMIN ===== */
 function isAdmin(req, res, next) {
   const user = users.find(u => u.login === req.session.user);
@@ -115,24 +103,14 @@ function isAdmin(req, res, next) {
 
 app.post("/api/admin/match", isAdmin, (req, res) => {
   const { a, b } = req.body;
-
-  matches.push({
-    id: matchId++,
-    a,
-    b,
-    status: "open"
-  });
-
+  matches.push({ id: matchId++, a, b, status: "open" });
   res.json({ ok: true });
 });
 
 app.post("/api/admin/finish", isAdmin, (req, res) => {
   const { id, result } = req.body;
   const match = matches.find(m => m.id === Number(id));
-
-  if (!match || match.status !== "open") {
-    return res.status(400).json({ error: "Błąd meczu" });
-  }
+  if (!match) return res.status(400).json({ error: "Brak meczu" });
 
   match.status = "done";
   match.result = result;
@@ -144,23 +122,6 @@ app.post("/api/admin/finish", isAdmin, (req, res) => {
       if (!u) return;
       if (result === "draw") u.saldo += b.amount;
       if (b.team === result) u.saldo += b.amount * 2;
-    });
-
-  res.json({ ok: true });
-});
-
-app.post("/api/admin/cancel", isAdmin, (req, res) => {
-  const { id } = req.body;
-  const match = matches.find(m => m.id === Number(id));
-  if (!match) return res.status(400).json({ error: "Brak meczu" });
-
-  match.status = "cancelled";
-
-  bets
-    .filter(b => b.matchId === match.id)
-    .forEach(b => {
-      const u = users.find(x => x.login === b.user);
-      if (u) u.saldo += b.amount;
     });
 
   res.json({ ok: true });
