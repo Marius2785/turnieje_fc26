@@ -8,79 +8,70 @@
 <body>
 
 <div class="container">
-  <h1>Turnieje FC 26</h1>
+<h1>Turnieje FC 26</h1>
 
-  <div id="auth" class="card">
-    <h2>Logowanie</h2>
-    <input id="loginInput" placeholder="login">
-    <input id="passwordInput" type="password" placeholder="hasło">
-    <button onclick="doLogin()">Zaloguj</button>
+<div id="auth" class="card">
+  <h2>Logowanie</h2>
+  <input id="loginInput" placeholder="login">
+  <input id="passwordInput" type="password" placeholder="hasło">
+  <button onclick="doLogin()">Zaloguj</button>
 
-    <h2>Rejestracja</h2>
-    <input id="rloginInput" placeholder="login">
-    <input id="rpasswordInput" type="password" placeholder="hasło">
-    <button onclick="doRegister()">Zarejestruj</button>
+  <h2>Rejestracja</h2>
+  <input id="rloginInput" placeholder="login">
+  <input id="rpasswordInput" type="password" placeholder="hasło">
+  <button onclick="doRegister()">Zarejestruj</button>
 
-    <p id="msg"></p>
+  <p id="msg"></p>
+</div>
+
+<div id="panel" style="display:none">
+  <div class="card">
+    <p id="me"></p>
+    <button onclick="logout()">Wyloguj</button>
   </div>
 
-  <div id="panel" style="display:none">
-    <div class="card">
-      <p id="me"></p>
-      <button onclick="logout()">Wyloguj</button>
-    </div>
-
-    <div id="matches"></div>
-    <div id="admin"></div>
-  </div>
+  <div id="matches"></div>
+  <div id="admin"></div>
+</div>
 </div>
 
 <script>
 const msg = document.getElementById("msg");
 
-async function api(url, data) {
-  const r = await fetch(url, {
-    method: "POST",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify(data)
+async function api(url,data){
+  const r = await fetch(url,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(data)
   });
   const j = await r.json();
-  if (!r.ok) throw j;
+  if(!r.ok) throw j;
   return j;
 }
 
-async function doLogin() {
-  msg.innerText = "";
-  try {
-    await api("/api/login", {
-      login: document.getElementById("loginInput").value,
-      password: document.getElementById("passwordInput").value
+async function doLogin(){
+  try{
+    await api("/api/login",{
+      login:loginInput.value,
+      password:passwordInput.value
     });
     load();
-  } catch(e) {
-    msg.innerText = e.error || "Błąd logowania";
-  }
+  }catch(e){ msg.innerText=e.error; }
 }
 
-async function doRegister() {
-  msg.innerText = "";
-  try {
-    await api("/api/register", {
-      login: document.getElementById("rloginInput").value,
-      password: document.getElementById("rpasswordInput").value
+async function doRegister(){
+  try{
+    await api("/api/register",{
+      login:rloginInput.value,
+      password:rpasswordInput.value
     });
-    msg.innerText = "Zarejestrowano pomyślnie";
-  } catch(e) {
-    msg.innerText = e.error || "Błąd rejestracji";
-  }
+    msg.innerText="Zarejestrowano";
+  }catch(e){ msg.innerText=e.error; }
 }
 
-async function logout() {
-  await api("/api/logout", {});
-  load();
-}
+async function logout(){ await api("/api/logout",{}); load(); }
 
-async function load() {
+async function load(){
   const me = await fetch("/api/me").then(r=>r.json());
 
   if(!me.logged){
@@ -95,18 +86,33 @@ async function load() {
     `${me.login} | Saldo: ${me.saldo} 💰`;
 
   const matches = await fetch("/api/matches").then(r=>r.json());
-  document.getElementById("matches").innerHTML =
-    matches.map(m=>`
-      <div class="card match">
-        <b>${m.a} vs ${m.b}</b>
-        <p>Status: ${m.status}</p>
-        ${m.status==="open" ? `
-          <button onclick="bet(${m.id},'a')">${m.a}</button>
-          <button onclick="bet(${m.id},'b')">${m.b}</button>
-          <button onclick="bet(${m.id},'draw')">Remis</button>
-        ` : ``}
-      </div>
-    `).join("");
+
+  matchesDiv.innerHTML = matches.map(m=>`
+    <div class="card match">
+      <h3>${m.a} vs ${m.b}</h3>
+      <p>Status: ${m.status}</p>
+
+      <p>
+        ${m.a} (${m.odds.a}) |
+        Remis (${m.odds.draw}) |
+        ${m.b} (${m.odds.b})
+      </p>
+
+      ${m.status==="open" ? `
+        <button onclick="bet(${m.id},'a')">${m.a}</button>
+        <button onclick="bet(${m.id},'draw')">Remis</button>
+        <button onclick="bet(${m.id},'b')">${m.b}</button>
+      ` : ``}
+
+      ${me.admin && m.status==="open" ? `
+        <hr>
+        <button onclick="finish(${m.id},'a')">✅ ${m.a}</button>
+        <button onclick="finish(${m.id},'draw')">🤝 Remis</button>
+        <button onclick="finish(${m.id},'b')">✅ ${m.b}</button>
+        <button onclick="cancel(${m.id})">❌ Anuluj</button>
+      ` : ``}
+    </div>
+  `).join("");
 
   if(me.admin){
     admin.innerHTML = `
@@ -115,14 +121,6 @@ async function load() {
         <input id="a" placeholder="Gracz A">
         <input id="b" placeholder="Gracz B">
         <button onclick="addMatch()">Dodaj mecz</button>
-
-        <hr>
-
-        <input id="mid" placeholder="ID meczu">
-        <button onclick="finish('a')">Wygrywa A</button>
-        <button onclick="finish('b')">Wygrywa B</button>
-        <button onclick="finish('draw')">Remis</button>
-        <button onclick="cancelMatch()">Anuluj mecz</button>
       </div>
     `;
   }
@@ -140,18 +138,18 @@ async function addMatch(){
   load();
 }
 
-async function finish(r){
-  await api("/api/admin/finish",{id:+mid.value,result:r});
+async function finish(id,r){
+  await api("/api/admin/finish",{id,result:r});
   load();
 }
 
-async function cancelMatch(){
-  await api("/api/admin/cancel",{id:+mid.value});
+async function cancel(id){
+  await api("/api/admin/cancel",{id});
   load();
 }
 
+const matchesDiv = document.getElementById("matches");
 load();
 </script>
-
 </body>
 </html>
