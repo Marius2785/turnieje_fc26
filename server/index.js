@@ -4,19 +4,26 @@ import fetch from "node-fetch";
 import path from "path";
 import { fileURLToPath } from "url";
 
-/* ====== PATH ====== */
+/* ===== PATH ===== */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-/* ====== RENDER / HTTPS FIX (BARDZO WAŻNE) ====== */
+/* ===== RENDER / PROXY / HTTPS FIX ===== */
 app.set("trust proxy", 1);
 
-/* ====== STATIC FILES ====== */
+app.use((req, res, next) => {
+  if (req.headers["x-forwarded-proto"] !== "https") {
+    return res.redirect("https://" + req.headers.host + req.url);
+  }
+  next();
+});
+
+/* ===== STATIC FILES ===== */
 app.use(express.static(path.join(__dirname, "public")));
 
-/* ====== KONFIG ====== */
+/* ===== KONFIG ===== */
 const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const CALLBACK_URL =
@@ -27,21 +34,23 @@ const ADMINS = [
   "1110642941875191880"
 ];
 
-/* ====== SESJA (POPRAWIONA POD RENDER) ====== */
+/* ===== SESJA (RENDER SAFE) ===== */
 app.use(
   session({
     name: "fc26.sid",
     secret: "fc26-secret",
     resave: false,
     saveUninitialized: false,
+    proxy: true,
     cookie: {
       secure: true,
-      sameSite: "none"
+      sameSite: "none",
+      maxAge: 1000 * 60 * 60 * 24
     }
   })
 );
 
-/* ====== STRONA GŁÓWNA ====== */
+/* ===== STRONA GŁÓWNA ===== */
 app.get("/", (req, res) => {
   if (!req.session.user) {
     return res.sendFile(path.join(__dirname, "public", "index.html"));
@@ -70,7 +79,7 @@ app.get("/", (req, res) => {
   `);
 });
 
-/* ====== START LOGOWANIA ====== */
+/* ===== START LOGOWANIA ===== */
 app.get("/auth/discord", (req, res) => {
   const url =
     `https://discord.com/api/oauth2/authorize` +
@@ -81,48 +90,57 @@ app.get("/auth/discord", (req, res) => {
   res.redirect(url);
 });
 
-/* ====== CALLBACK ====== */
+/* ===== CALLBACK ===== */
 app.get("/auth/discord/callback", async (req, res) => {
-  const code = req.query.code;
-  if (!code) return res.send("Brak kodu Discord");
+  try {
+    const code = req.query.code;
+    if (!code) return res.send("Brak kodu Discord");
 
-  const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: CALLBACK_URL
-    })
-  });
+    const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: CALLBACK_URL
+      })
+    });
 
-  const tokenData = await tokenRes.json();
+    const tokenData = await tokenRes.json();
 
-  const userRes = await fetch("https://discord.com/api/users/@me", {
-    headers: {
-      Authorization: `Bearer ${tokenData.access_token}`
+    if (!tokenData.access_token) {
+      return res.send("Błąd logowania Discord (token)");
     }
-  });
 
-  const user = await userRes.json();
+    const userRes = await fetch("https://discord.com/api/users/@me", {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`
+      }
+    });
 
-  req.session.user = {
-    id: user.id,
-    username: user.username
-  };
+    const user = await userRes.json();
 
-  res.redirect("/");
+    req.session.user = {
+      id: user.id,
+      username: user.username
+    };
+
+    res.redirect("/");
+  } catch (err) {
+    console.error(err);
+    res.send("Błąd serwera podczas logowania");
+  }
 });
 
-/* ====== WYLOGUJ ====== */
+/* ===== WYLOGUJ ===== */
 app.get("/logout", (req, res) => {
   req.session.destroy(() => {
     res.redirect("/");
   });
 });
 
-/* ====== START ====== */
+/* ===== START ===== */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("ONLINE"));
