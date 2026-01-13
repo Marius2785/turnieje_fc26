@@ -9,7 +9,7 @@
 
 <h1>Turnieje FC 26</h1>
 
-<div id="msg" style="color:red;"></div>
+<div id="msg"></div>
 
 <div id="auth">
   <h2>Logowanie</h2>
@@ -34,6 +34,13 @@
 </div>
 
 <script>
+const msg = document.getElementById("msg");
+
+function show(text, ok=false) {
+  msg.style.color = ok ? "green" : "red";
+  msg.innerText = text;
+}
+
 async function post(url, data) {
   const res = await fetch(url, {
     method: "POST",
@@ -43,12 +50,6 @@ async function post(url, data) {
   const json = await res.json();
   if (!res.ok) throw json;
   return json;
-}
-
-function show(msg, ok=false) {
-  const el = document.getElementById("msg");
-  el.style.color = ok ? "green" : "red";
-  el.innerText = msg;
 }
 
 async function loginUser() {
@@ -70,7 +71,7 @@ async function registerUser() {
       login: rlogin.value,
       password: rpassword.value
     });
-    show("Rejestracja udana ✔", true);
+    show("Rejestracja OK ✔", true);
   } catch (e) {
     show(e.error || "Błąd rejestracji");
   }
@@ -82,10 +83,10 @@ async function logout() {
 }
 
 async function load() {
-  const res = await fetch("/api/me");
-  const me = await res.json();
+  const meRes = await fetch("/api/me");
+  const meData = await meRes.json();
 
-  if (!me.logged) {
+  if (!meData.logged) {
     auth.style.display = "block";
     panel.style.display = "none";
     return;
@@ -93,7 +94,8 @@ async function load() {
 
   auth.style.display = "none";
   panel.style.display = "block";
-  me.textContent = `${me.login} | Saldo: ${me.saldo} 💰`;
+  document.getElementById("me").innerText =
+    `${meData.login} | Saldo: ${meData.saldo} 💰`;
 
   const matches = await fetch("/api/matches").then(r => r.json());
   document.getElementById("matches").innerHTML =
@@ -107,7 +109,7 @@ async function load() {
       </div>`
     ).join("");
 
-  if (me.admin) {
+  if (meData.admin) {
     admin.innerHTML = `
       <h2>ADMIN</h2>
       <input id="a" placeholder="Gracz A">
@@ -134,5 +136,6 @@ async function addMatch() {
 
 load();
 </script>
+
 </body>
 </html>
