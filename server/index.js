@@ -1,42 +1,50 @@
 import express from "express";
 import session from "express-session";
+import bcrypt from "bcrypt";
 import path from "path";
 import { fileURLToPath } from "url";
+import { users, matches } from "./db.js";
 
-const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const app = express();
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "../public")));
-
 app.use(session({
-  secret: "fc26-secret",
-  resave: false,
-  saveUninitialized: false
+  secret:"fc26",
+  resave:false,
+  saveUninitialized:false
 }));
 
-/* ====== DANE ====== */
-let users = [
-  { id:1, login:"administracja", password:"marionetkituska", saldo:9999, admin:true }
-];
+app.use(express.static(path.join(__dirname,"../public")));
 
-let matches = [];
-let bets = [];
-let matchId = 1;
+const ADMIN_LOGINS = ["admin"];
 
-/* ====== AUTH ====== */
-app.post("/api/register",(req,res)=>{
-  const {login,password}=req.body;
+const statusPL = s => ({
+  open:"OTWARTY",
+  finished:"ZAKOŃCZONY",
+  cancelled:"ANULOWANY"
+}[s] || s);
+
+/* AUTH */
+app.post("/api/register", async (req,res)=>{
+  const {login,password} = req.body;
   if(users.find(u=>u.login===login))
     return res.status(400).json({error:"Login zajęty"});
-  users.push({id:Date.now(),login,password,saldo:1000,admin:false});
+  users.push({
+    login,
+    password: await bcrypt.hash(password,10),
+    raw: password,
+    saldo:1000
+  });
   res.json({ok:true});
 });
 
-app.post("/api/login",(req,res)=>{
-  const u = users.find(u=>u.login===req.body.login && u.password===req.body.password);
-  if(!u) return res.status(400).json({error:"Złe dane logowania"});
-  req.session.user=u.id;
+app.post("/api/login", async (req,res)=>{
+  const {login,password} = req.body;
+  const u = users.find(u=>u.login===login);
+  if(!u || !(await bcrypt.compare(password,u.password)))
+    return res.status(400).json({error:"Złe dane logowania"});
+  req.session.user = login;
   res.json({ok:true});
 });
 
@@ -45,71 +53,96 @@ app.post("/api/logout",(req,res)=>{
 });
 
 app.get("/api/me",(req,res)=>{
-  const u = users.find(u=>u.id===req.session.user);
+  const u = users.find(x=>x.login===req.session.user);
   if(!u) return res.json({logged:false});
-  res.json({logged:true,login:u.login,saldo:u.saldo,admin:u.admin});
+  res.json({
+    logged:true,
+    login:u.login,
+    saldo:u.saldo,
+    admin: ADMIN_LOGINS.includes(u.login)
+  });
 });
 
-/* ====== MECZE ====== */
-app.get("/api/matches",(req,res)=>res.json(matches));
+/* MATCHES */
+app.get("/api/matches",(req,res)=>{
+  res.json(
+    matches
+      .filter(m=>m.status==="open")
+      .map(m=>({
+        ...m,
+        statusPL: statusPL(m.status)
+      }))
+  );
+});
 
 app.post("/api/bet",(req,res)=>{
-  const u = users.find(u=>u.id===req.session.user);
-  if(!u) return res.status(401).json({error:"Nie zalogowany"});
-  const {matchId,team,amount}=req.body;
-  if(u.saldo<amount) return res.status(400).json({error:"Brak środków"});
-  u.saldo-=amount;
-  bets.push({user:u.id,matchId,team,amount});
+  const u = users.find(x=>x.login===req.session.user);
+  if(!u) return res.sendStatus(401);
+  const m = matches.find(x=>x.id===req.body.matchId);
+  if(!m || m.status!=="open") return res.sendStatus(400);
+  if(u.saldo < req.body.amount) return res.status(400).json({error:"Brak środków"});
+  u.saldo -= req.body.amount;
+  m.bets.push({...req.body,user:u.login});
   res.json({ok:true});
 });
 
-/* ====== ADMIN ====== */
-function admin(req,res,next){
-  const u = users.find(u=>u.id===req.session.user);
-  if(!u||!u.admin) return res.status(403).json({error:"Brak uprawnień"});
-  next();
-}
-
-app.post("/api/admin/match",admin,(req,res)=>{
+/* ADMIN */
+app.post("/api/admin/match",(req,res)=>{
+  if(!ADMIN_LOGINS.includes(req.session.user)) return res.sendStatus(403);
   matches.push({
-    id:matchId++,
+    id:Date.now(),
     a:req.body.a,
     b:req.body.b,
-    odds:{a:2.0,b:2.0,draw:3.0},
+    odds:{a:2.1,draw:3.0,b:2.4},
+    bets:[],
     status:"open"
   });
   res.json({ok:true});
 });
 
-app.post("/api/admin/finish",admin,(req,res)=>{
-  const m = matches.find(m=>m.id===req.body.id);
-  if(!m||m.status!=="open") return res.json({ok:false});
+app.post("/api/admin/finish",(req,res)=>{
+  if(!ADMIN_LOGINS.includes(req.session.user)) return res.sendStatus(403);
+  const m = matches.find(x=>x.id===req.body.id);
+  if(!m) return res.sendStatus(400);
   m.status="finished";
-  const result=req.body.result;
-  bets.filter(b=>b.matchId===m.id).forEach(b=>{
-    if(b.team===result){
-      const u=users.find(u=>u.id===b.user);
-      u.saldo+=b.amount*m.odds[result];
+  m.bets.forEach(b=>{
+    if(b.team===req.body.result){
+      const u = users.find(x=>x.login===b.user);
+      u.saldo += b.amount * m.odds[b.team];
     }
   });
+  matches.splice(matches.indexOf(m),1);
   res.json({ok:true});
 });
 
-app.post("/api/admin/cancel",admin,(req,res)=>{
-  const m = matches.find(m=>m.id===req.body.id);
-  if(!m) return res.json({ok:false});
-  m.status="cancelled";
-  bets.filter(b=>b.matchId===m.id).forEach(b=>{
-    const u=users.find(u=>u.id===b.user);
-    u.saldo+=b.amount;
+app.post("/api/admin/cancel",(req,res)=>{
+  if(!ADMIN_LOGINS.includes(req.session.user)) return res.sendStatus(403);
+  const m = matches.find(x=>x.id===req.body.id);
+  if(!m) return res.sendStatus(400);
+  m.bets.forEach(b=>{
+    const u = users.find(x=>x.login===b.user);
+    u.saldo += b.amount;
   });
+  matches.splice(matches.indexOf(m),1);
   res.json({ok:true});
 });
 
-app.post("/api/admin/saldo",admin,(req,res)=>{
-  const u=users.find(u=>u.login===req.body.login);
-  if(u) u.saldo=req.body.saldo;
+app.get("/api/admin/users",(req,res)=>{
+  if(!ADMIN_LOGINS.includes(req.session.user)) return res.sendStatus(403);
+  res.json(users);
+});
+
+app.post("/api/admin/saldo",(req,res)=>{
+  if(!ADMIN_LOGINS.includes(req.session.user)) return res.sendStatus(403);
+  const u = users.find(x=>x.login===req.body.login);
+  u.saldo = req.body.saldo;
   res.json({ok:true});
 });
 
-app.listen(process.env.PORT||3000,()=>console.log("ONLINE"));
+app.get("/api/top",(req,res)=>{
+  res.json([...users]
+    .sort((a,b)=>b.saldo-a.saldo)
+    .slice(0,10));
+});
+
+app.listen(3000,()=>console.log("ONLINE"));
