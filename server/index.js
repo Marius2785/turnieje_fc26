@@ -1,52 +1,42 @@
-const express = require("express");
-const session = require("express-session");
-const path = require("path");
+import express from "express";
+import session from "express-session";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const app = express();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "../public")));
 
 app.use(session({
-  secret: "secret123",
+  secret: "fc26-secret",
   resave: false,
   saveUninitialized: false
 }));
 
-/* ===== DANE ===== */
-
+/* ====== DANE ====== */
 let users = [
-  { login: "admin", password: "admin123", admin: true, saldo: 1000 }
+  { id:1, login:"admin", password:"admin123", saldo:10000, admin:true }
 ];
 
 let matches = [];
 let bets = [];
 let matchId = 1;
 
-/* ===== MIDDLEWARE ===== */
-
-function isAdmin(req,res,next){
-  const u = users.find(x=>x.login===req.session.user);
-  if(!u || !u.admin) return res.status(403).json({error:"Brak dostępu"});
-  next();
-}
-
-/* ===== AUTH ===== */
-
+/* ====== AUTH ====== */
 app.post("/api/register",(req,res)=>{
-  const {login,password} = req.body;
-  if(!login || !password)
-    return res.status(400).json({error:"Brak danych"});
+  const {login,password}=req.body;
   if(users.find(u=>u.login===login))
     return res.status(400).json({error:"Login zajęty"});
-
-  users.push({ login, password, admin:false, saldo:1000 });
+  users.push({id:Date.now(),login,password,saldo:1000,admin:false});
   res.json({ok:true});
 });
 
 app.post("/api/login",(req,res)=>{
-  const {login,password} = req.body;
-  const u = users.find(x=>x.login===login && x.password===password);
+  const u = users.find(u=>u.login===req.body.login && u.password===req.body.password);
   if(!u) return res.status(400).json({error:"Złe dane logowania"});
-  req.session.user = u.login;
+  req.session.user=u.id;
   res.json({ok:true});
 });
 
@@ -55,83 +45,71 @@ app.post("/api/logout",(req,res)=>{
 });
 
 app.get("/api/me",(req,res)=>{
-  const u = users.find(x=>x.login===req.session.user);
+  const u = users.find(u=>u.id===req.session.user);
   if(!u) return res.json({logged:false});
-  res.json({ logged:true, login:u.login, saldo:u.saldo, admin:u.admin });
+  res.json({logged:true,login:u.login,saldo:u.saldo,admin:u.admin});
 });
 
-/* ===== MECZE ===== */
-
+/* ====== MECZE ====== */
 app.get("/api/matches",(req,res)=>res.json(matches));
 
-app.post("/api/admin/match",isAdmin,(req,res)=>{
-  const {a,b} = req.body;
+app.post("/api/bet",(req,res)=>{
+  const u = users.find(u=>u.id===req.session.user);
+  if(!u) return res.status(401).json({error:"Nie zalogowany"});
+  const {matchId,team,amount}=req.body;
+  if(u.saldo<amount) return res.status(400).json({error:"Brak środków"});
+  u.saldo-=amount;
+  bets.push({user:u.id,matchId,team,amount});
+  res.json({ok:true});
+});
+
+/* ====== ADMIN ====== */
+function admin(req,res,next){
+  const u = users.find(u=>u.id===req.session.user);
+  if(!u||!u.admin) return res.status(403).json({error:"Brak uprawnień"});
+  next();
+}
+
+app.post("/api/admin/match",admin,(req,res)=>{
   matches.push({
-    id: matchId++,
-    a, b,
-    status:"open",
-    pool:{a:0,b:0,draw:0},
-    odds:{a:2,b:2,draw:3}
+    id:matchId++,
+    a:req.body.a,
+    b:req.body.b,
+    odds:{a:2.0,b:2.0,draw:3.0},
+    status:"open"
   });
   res.json({ok:true});
 });
 
-app.post("/api/bet",(req,res)=>{
-  const u = users.find(x=>x.login===req.session.user);
-  if(!u) return res.status(401).json({error:"Nie zalogowany"});
-
-  let {matchId,team,amount} = req.body;
-  amount = Number(amount);
-
-  if(amount<=0) return res.status(400).json({error:"Zła kwota"});
-
-  const m = matches.find(x=>x.id===Number(matchId));
-  if(!m || m.status!=="open")
-    return res.status(400).json({error:"Mecz zamknięty"});
-
-  if(u.saldo < amount)
-    return res.status(400).json({error:"Brak środków"});
-
-  u.saldo -= amount;
-  m.pool[team] += amount;
-
-  const total = m.pool.a + m.pool.b + m.pool.draw;
-  m.odds.a = total / (m.pool.a||1);
-  m.odds.b = total / (m.pool.b||1);
-  m.odds.draw = total / (m.pool.draw||1);
-
-  bets.push({user:u.login,matchId:m.id,team,amount});
-  res.json({ok:true});
-});
-
-app.post("/api/admin/finish",isAdmin,(req,res)=>{
-  const {id,result} = req.body;
-  const m = matches.find(x=>x.id===id);
-  if(!m) return res.status(404).json({error:"Brak meczu"});
+app.post("/api/admin/finish",admin,(req,res)=>{
+  const m = matches.find(m=>m.id===req.body.id);
+  if(!m||m.status!=="open") return res.json({ok:false});
   m.status="finished";
-
-  bets.filter(b=>b.matchId===id && b.team===result)
-    .forEach(b=>{
-      const u = users.find(x=>x.login===b.user);
-      u.saldo += b.amount * m.odds[result];
-    });
-
+  const result=req.body.result;
+  bets.filter(b=>b.matchId===m.id).forEach(b=>{
+    if(b.team===result){
+      const u=users.find(u=>u.id===b.user);
+      u.saldo+=b.amount*m.odds[result];
+    }
+  });
   res.json({ok:true});
 });
 
-/* ===== ADMIN SALDO ===== */
-
-app.get("/api/admin/users",isAdmin,(req,res)=>res.json(users));
-
-app.post("/api/admin/saldo",isAdmin,(req,res)=>{
-  const {login,saldo} = req.body;
-  const u = users.find(x=>x.login===login);
-  if(!u) return res.status(404).json({error:"Brak usera"});
-  u.saldo = Number(saldo);
+app.post("/api/admin/cancel",admin,(req,res)=>{
+  const m = matches.find(m=>m.id===req.body.id);
+  if(!m) return res.json({ok:false});
+  m.status="cancelled";
+  bets.filter(b=>b.matchId===m.id).forEach(b=>{
+    const u=users.find(u=>u.id===b.user);
+    u.saldo+=b.amount;
+  });
   res.json({ok:true});
 });
 
-/* ===== STATIC ===== */
+app.post("/api/admin/saldo",admin,(req,res)=>{
+  const u=users.find(u=>u.login===req.body.login);
+  if(u) u.saldo=req.body.saldo;
+  res.json({ok:true});
+});
 
-app.use(express.static(path.join(__dirname,"../public")));
-app.listen(3000,()=>console.log("ONLINE"));
+app.listen(process.env.PORT||3000,()=>console.log("ONLINE"));
