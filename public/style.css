@@ -1,47 +1,62 @@
-* {
-  box-sizing: border-box;
-  font-family: Arial, sans-serif;
-}
-
 body {
   margin: 0;
-  height: 100vh;
-  background: linear-gradient(135deg, #0b1d3a, #020a18);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  color: white;
+  font-family: Arial, sans-serif;
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+h1, h2 {
+  text-align: center;
+}
+
+.container {
+  max-width: 900px;
+  margin: auto;
+  padding: 20px;
 }
 
 .card {
-  background: rgba(0, 0, 0, 0.4);
-  padding: 40px 50px;
-  border-radius: 12px;
-  text-align: center;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  background: #020617;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 0 15px rgba(0,0,0,.6);
 }
 
-.card h1 {
-  margin-top: 0;
-  font-size: 28px;
+input, button, select {
+  width: 100%;
+  padding: 10px;
+  margin: 6px 0;
+  border-radius: 6px;
+  border: none;
 }
 
-.card p {
-  opacity: 0.85;
+input, select {
+  background: #020617;
+  color: white;
+  border: 1px solid #334155;
 }
 
-.btn {
-  display: inline-block;
-  margin-top: 25px;
-  padding: 12px 25px;
+button {
   background: #2563eb;
   color: white;
-  text-decoration: none;
-  border-radius: 8px;
   font-weight: bold;
-  transition: 0.2s;
+  cursor: pointer;
 }
 
-.btn:hover {
-  background: #1d4ed8;
+button.red { background: #dc2626; }
+button.green { background: #16a34a; }
+button.gray { background: #475569; }
+
+button:hover { opacity: .9 }
+
+.match {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin {
+  border: 2px solid #2563eb;
 }
