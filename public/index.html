@@ -1,12 +1,115 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8" />
-  <title>Turnieje FC 26</title>
-  <link rel="stylesheet" href="style.css" />
+<meta charset="UTF-8" />
+<title>Turnieje FC 26</title>
 </head>
 <body>
-  <div id="app"></div>
-  <script src="app.js"></script>
+<h1>Turnieje FC 26</h1>
+
+<div id="auth">
+  <h2>Logowanie</h2>
+  <input id="login" placeholder="login" />
+  <input id="password" placeholder="hasło" type="password" />
+  <button onclick="login()">Zaloguj</button>
+
+  <h2>Rejestracja</h2>
+  <input id="rlogin" placeholder="login" />
+  <input id="rpassword" placeholder="hasło" type="password" />
+  <button onclick="register()">Zarejestruj</button>
+</div>
+
+<div id="panel" style="display:none">
+  <p id="me"></p>
+  <button onclick="logout()">Wyloguj</button>
+
+  <h2>Mecze</h2>
+  <div id="matches"></div>
+
+  <div id="admin"></div>
+</div>
+
+<script>
+async function api(url, data) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+  return res.json();
+}
+
+async function login() {
+  await api("/api/login", {
+    login: login.value,
+    password: password.value
+  });
+  load();
+}
+
+async function register() {
+  await api("/api/register", {
+    login: rlogin.value,
+    password: rpassword.value
+  });
+  alert("Zarejestrowano");
+}
+
+async function logout() {
+  await api("/api/logout", {});
+  load();
+}
+
+async function load() {
+  const me = await fetch("/api/me").then(r => r.json());
+  if (!me.logged) {
+    auth.style.display = "block";
+    panel.style.display = "none";
+    return;
+  }
+
+  auth.style.display = "none";
+  panel.style.display = "block";
+  document.getElementById("me").innerText =
+    `${me.login} | Saldo: ${me.saldo}`;
+
+  const matches = await fetch("/api/matches").then(r => r.json());
+  document.getElementById("matches").innerHTML =
+    matches.map(m =>
+      `<div>
+        ${m.a} vs ${m.b}
+        ${m.open ? `
+        <button onclick="bet(${m.id},'a')">A</button>
+        <button onclick="bet(${m.id},'b')">B</button>` :
+        `Zamknięty, wygrał: ${m.winner}`}
+      </div>`
+    ).join("");
+
+  if (me.admin) {
+    admin.innerHTML = `
+      <h2>ADMIN</h2>
+      <input id="a" placeholder="Gracz A">
+      <input id="b" placeholder="Gracz B">
+      <button onclick="addMatch()">Dodaj mecz</button>
+    `;
+  }
+}
+
+async function bet(id, team) {
+  const amount = prompt("Kwota");
+  await api("/api/bet", { matchId: id, team, amount: Number(amount) });
+  load();
+}
+
+async function addMatch() {
+  await api("/api/admin/match", {
+    a: a.value,
+    b: b.value
+  });
+  load();
+}
+
+load();
+</script>
 </body>
 </html>
