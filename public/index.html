@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-<meta charset="UTF-8" />
-<title>Turnieje FC 26</title>
+  <meta charset="UTF-8" />
+  <title>Turnieje FC 26</title>
+
+  <!-- PODPIĘCIE STYLU -->
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
 <h1>Turnieje FC 26</h1>
 
 <div id="auth">
@@ -71,23 +75,23 @@ async function load() {
   auth.style.display = "none";
   panel.style.display = "block";
   document.getElementById("me").innerText =
-    `${me.login} | Saldo: ${me.saldo}`;
+    `${me.login} | Saldo: ${me.saldo} 💰`;
 
   const matches = await fetch("/api/matches").then(r => r.json());
   document.getElementById("matches").innerHTML =
     matches.map(m =>
-      `<div>
-        ${m.a} vs ${m.b}
+      `<div class="match">
+        <b>${m.a}</b> vs <b>${m.b}</b>
         ${m.open ? `
-        <button onclick="bet(${m.id},'a')">A</button>
-        <button onclick="bet(${m.id},'b')">B</button>` :
-        `Zamknięty, wygrał: ${m.winner}`}
+        <button onclick="bet(${m.id},'a')">Obstaw ${m.a}</button>
+        <button onclick="bet(${m.id},'b')">Obstaw ${m.b}</button>` :
+        `<span>Zamknięty — wygrał: ${m.winner}</span>`}
       </div>`
     ).join("");
 
   if (me.admin) {
     admin.innerHTML = `
-      <h2>ADMIN</h2>
+      <h2>Panel admina</h2>
       <input id="a" placeholder="Gracz A">
       <input id="b" placeholder="Gracz B">
       <button onclick="addMatch()">Dodaj mecz</button>
@@ -96,7 +100,7 @@ async function load() {
 }
 
 async function bet(id, team) {
-  const amount = prompt("Kwota");
+  const amount = prompt("Kwota obstawienia");
   await api("/api/bet", { matchId: id, team, amount: Number(amount) });
   load();
 }
@@ -111,5 +115,6 @@ async function addMatch() {
 
 load();
 </script>
+
 </body>
 </html>
