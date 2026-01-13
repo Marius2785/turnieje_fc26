@@ -9,9 +9,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 /* ===== KONFIG ===== */
-const ADMINS = ["admin", "mariusz"]; // ← TU DODAJESZ ADMINÓW (LOGINY)
+const ADMINS = ["admin", "mariusz"];
 
-/* ===== FAKE BAZA UŻYTKOWNIKÓW ===== */
 const USERS = [
   { login: "admin", password: "admin123" },
   { login: "user", password: "user123" }
@@ -20,6 +19,7 @@ const USERS = [
 /* ===== MIDDLEWARE ===== */
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 app.use(
   session({
     secret: "fc26-secret",
@@ -28,11 +28,10 @@ app.use(
   })
 );
 
-app.use(express.static(path.join(__dirname, "../public")));
+/* 🔴 KLUCZOWA LINIA – POPRAWNA ŚCIEŻKA */
+app.use(express.static(path.join(__dirname, "..", "public")));
 
 /* ===== API ===== */
-
-// sprawdzanie sesji
 app.get("/api/me", (req, res) => {
   if (!req.session.user) return res.json({ logged: false });
 
@@ -43,7 +42,6 @@ app.get("/api/me", (req, res) => {
   });
 });
 
-// logowanie
 app.post("/api/login", (req, res) => {
   const { login, password } = req.body;
 
@@ -59,16 +57,15 @@ app.post("/api/login", (req, res) => {
   res.json({ success: true });
 });
 
-// wylogowanie
 app.post("/api/logout", (req, res) => {
   req.session.destroy(() => {
     res.json({ success: true });
   });
 });
 
-/* ===== FRONT ===== */
+/* 🔴 TU TEŻ POPRAWNA ŚCIEŻKA */
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../public/index.html"));
+  res.sendFile(path.join(__dirname, "..", "public", "index.html"));
 });
 
 /* ===== START ===== */
