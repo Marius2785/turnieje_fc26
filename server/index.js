@@ -17,7 +17,7 @@ app.use(session({
 
 /* ====== DANE ====== */
 let users = [
-  { id:1, login:"admin", password:"admin123", saldo:10000, admin:true }
+  { id:1, login:"administracja", password:"marionetkituska", saldo:9999, admin:true }
 ];
 
 let matches = [];
