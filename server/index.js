@@ -1,144 +1,74 @@
 import express from "express";
 import session from "express-session";
-import fetch from "node-fetch";
 import path from "path";
 import { fileURLToPath } from "url";
 
-/* ===== PATH ===== */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-/* ===== RENDER / PROXY / HTTPS FIX ===== */
-app.set("trust proxy", 1);
-
-app.use((req, res, next) => {
-  if (req.headers["x-forwarded-proto"] !== "https") {
-    return res.redirect("https://" + req.headers.host + req.url);
-  }
-  next();
-});
-
-/* ===== STATIC FILES ===== */
-app.use(express.static(path.join(__dirname, "public")));
-
 /* ===== KONFIG ===== */
-const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
-const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
-const CALLBACK_URL =
-  "https://turnieje-fc26.onrender.com/auth/discord/callback";
+const ADMINS = ["admin", "mariusz"]; // ← TU DODAJESZ ADMINÓW (LOGINY)
 
-const ADMINS = [
-  "878644549579341834",
-  "1110642941875191880"
+/* ===== FAKE BAZA UŻYTKOWNIKÓW ===== */
+const USERS = [
+  { login: "admin", password: "admin123" },
+  { login: "user", password: "user123" }
 ];
 
-/* ===== SESJA (RENDER SAFE) ===== */
+/* ===== MIDDLEWARE ===== */
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(
   session({
-    name: "fc26.sid",
     secret: "fc26-secret",
     resave: false,
-    saveUninitialized: false,
-    proxy: true,
-    cookie: {
-      secure: true,
-      sameSite: "none",
-      maxAge: 1000 * 60 * 60 * 24
-    }
+    saveUninitialized: false
   })
 );
 
-/* ===== STRONA GŁÓWNA ===== */
-app.get("/", (req, res) => {
-  if (!req.session.user) {
-    return res.sendFile(path.join(__dirname, "public", "index.html"));
-  }
+app.use(express.static(path.join(__dirname, "../public")));
 
-  const user = req.session.user;
-  const isAdmin = ADMINS.includes(user.id);
+/* ===== API ===== */
 
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="pl">
-    <head>
-      <meta charset="UTF-8" />
-      <title>Turnieje FC 26</title>
-      <link rel="stylesheet" href="/style.css" />
-    </head>
-    <body>
-      <div class="card">
-        <h1>Witaj ${user.username}</h1>
-        <p>Saldo: 1000 💰</p>
-        ${isAdmin ? "<p><b>Panel admina AKTYWNY</b></p>" : ""}
-        <a class="btn" href="/logout">Wyloguj</a>
-      </div>
-    </body>
-    </html>
-  `);
-});
+// sprawdzanie sesji
+app.get("/api/me", (req, res) => {
+  if (!req.session.user) return res.json({ logged: false });
 
-/* ===== START LOGOWANIA ===== */
-app.get("/auth/discord", (req, res) => {
-  const url =
-    `https://discord.com/api/oauth2/authorize` +
-    `?client_id=${CLIENT_ID}` +
-    `&redirect_uri=${encodeURIComponent(CALLBACK_URL)}` +
-    `&response_type=code&scope=identify`;
-
-  res.redirect(url);
-});
-
-/* ===== CALLBACK ===== */
-app.get("/auth/discord/callback", async (req, res) => {
-  try {
-    const code = req.query.code;
-    if (!code) return res.send("Brak kodu Discord");
-
-    const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: CALLBACK_URL
-      })
-    });
-
-    const tokenData = await tokenRes.json();
-
-    if (!tokenData.access_token) {
-      return res.send("Błąd logowania Discord (token)");
-    }
-
-    const userRes = await fetch("https://discord.com/api/users/@me", {
-      headers: {
-        Authorization: `Bearer ${tokenData.access_token}`
-      }
-    });
-
-    const user = await userRes.json();
-
-    req.session.user = {
-      id: user.id,
-      username: user.username
-    };
-
-    res.redirect("/");
-  } catch (err) {
-    console.error(err);
-    res.send("Błąd serwera podczas logowania");
-  }
-});
-
-/* ===== WYLOGUJ ===== */
-app.get("/logout", (req, res) => {
-  req.session.destroy(() => {
-    res.redirect("/");
+  res.json({
+    logged: true,
+    login: req.session.user.login,
+    admin: ADMINS.includes(req.session.user.login)
   });
+});
+
+// logowanie
+app.post("/api/login", (req, res) => {
+  const { login, password } = req.body;
+
+  const user = USERS.find(
+    u => u.login === login && u.password === password
+  );
+
+  if (!user) {
+    return res.status(401).json({ error: "Zły login lub hasło" });
+  }
+
+  req.session.user = { login: user.login };
+  res.json({ success: true });
+});
+
+// wylogowanie
+app.post("/api/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.json({ success: true });
+  });
+});
+
+/* ===== FRONT ===== */
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../public/index.html"));
 });
 
 /* ===== START ===== */
