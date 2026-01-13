@@ -12,25 +12,24 @@
 
   <div id="auth" class="card">
     <h2>Logowanie</h2>
-    <input id="login" placeholder="login">
-    <input id="password" type="password" placeholder="hasło">
-    <button onclick="login()">Zaloguj</button>
+    <input id="loginInput" placeholder="login">
+    <input id="passwordInput" type="password" placeholder="hasło">
+    <button onclick="doLogin()">Zaloguj</button>
 
     <h2>Rejestracja</h2>
-    <input id="rlogin" placeholder="login">
-    <input id="rpassword" type="password" placeholder="hasło">
-    <button onclick="register()">Zarejestruj</button>
+    <input id="regLogin" placeholder="login">
+    <input id="regPassword" type="password" placeholder="hasło">
+    <button onclick="doRegister()">Zarejestruj</button>
     <p id="msg"></p>
   </div>
 
   <div id="panel" style="display:none">
     <div class="card">
       <p id="me"></p>
-      <button class="gray" onclick="logout()">Wyloguj</button>
+      <button class="gray" onclick="doLogout()">Wyloguj</button>
     </div>
 
     <div id="matches"></div>
-
     <div id="adminPanel"></div>
   </div>
 </div>
@@ -49,21 +48,30 @@ async function api(url, data) {
   return j;
 }
 
-async function login() {
+async function doLogin() {
   try {
-    await api("/api/login",{login:login.value,password:password.value});
+    await api("/api/login",{
+      login: loginInput.value,
+      password: passwordInput.value
+    });
     load();
   } catch(e){ msg.innerText=e.error; }
 }
 
-async function register() {
+async function doRegister() {
   try {
-    await api("/api/register",{login:rlogin.value,password:rpassword.value});
+    await api("/api/register",{
+      login: regLogin.value,
+      password: regPassword.value
+    });
     msg.innerText="Zarejestrowano";
   } catch(e){ msg.innerText=e.error; }
 }
 
-async function logout(){ await api("/api/logout",{}); load(); }
+async function doLogout(){
+  await api("/api/logout",{});
+  load();
+}
 
 async function load(){
   const me = await fetch("/api/me").then(r=>r.json());
