@@ -1,26 +1,26 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Turnieje FC 26</title>
-
-  <!-- PODPIĘCIE STYLU -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <h1>Turnieje FC 26</h1>
 
+<div id="msg" style="color:red;"></div>
+
 <div id="auth">
   <h2>Logowanie</h2>
-  <input id="login" placeholder="login" />
-  <input id="password" placeholder="hasło" type="password" />
-  <button onclick="login()">Zaloguj</button>
+  <input id="login" placeholder="login">
+  <input id="password" type="password" placeholder="hasło">
+  <button onclick="loginUser()">Zaloguj</button>
 
   <h2>Rejestracja</h2>
-  <input id="rlogin" placeholder="login" />
-  <input id="rpassword" placeholder="hasło" type="password" />
-  <button onclick="register()">Zarejestruj</button>
+  <input id="rlogin" placeholder="login">
+  <input id="rpassword" type="password" placeholder="hasło">
+  <button onclick="registerUser()">Zarejestruj</button>
 </div>
 
 <div id="panel" style="display:none">
@@ -34,38 +34,57 @@
 </div>
 
 <script>
-async function api(url, data) {
+async function post(url, data) {
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
   });
-  return res.json();
+  const json = await res.json();
+  if (!res.ok) throw json;
+  return json;
 }
 
-async function login() {
-  await api("/api/login", {
-    login: login.value,
-    password: password.value
-  });
-  load();
+function show(msg, ok=false) {
+  const el = document.getElementById("msg");
+  el.style.color = ok ? "green" : "red";
+  el.innerText = msg;
 }
 
-async function register() {
-  await api("/api/register", {
-    login: rlogin.value,
-    password: rpassword.value
-  });
-  alert("Zarejestrowano");
+async function loginUser() {
+  try {
+    await post("/api/login", {
+      login: login.value,
+      password: password.value
+    });
+    show("Zalogowano ✔", true);
+    load();
+  } catch (e) {
+    show(e.error || "Błąd logowania");
+  }
+}
+
+async function registerUser() {
+  try {
+    await post("/api/register", {
+      login: rlogin.value,
+      password: rpassword.value
+    });
+    show("Rejestracja udana ✔", true);
+  } catch (e) {
+    show(e.error || "Błąd rejestracji");
+  }
 }
 
 async function logout() {
-  await api("/api/logout", {});
+  await post("/api/logout", {});
   load();
 }
 
 async function load() {
-  const me = await fetch("/api/me").then(r => r.json());
+  const res = await fetch("/api/me");
+  const me = await res.json();
+
   if (!me.logged) {
     auth.style.display = "block";
     panel.style.display = "none";
@@ -74,24 +93,23 @@ async function load() {
 
   auth.style.display = "none";
   panel.style.display = "block";
-  document.getElementById("me").innerText =
-    `${me.login} | Saldo: ${me.saldo} 💰`;
+  me.textContent = `${me.login} | Saldo: ${me.saldo} 💰`;
 
   const matches = await fetch("/api/matches").then(r => r.json());
   document.getElementById("matches").innerHTML =
     matches.map(m =>
-      `<div class="match">
-        <b>${m.a}</b> vs <b>${m.b}</b>
+      `<div>
+        ${m.a} vs ${m.b}
         ${m.open ? `
-        <button onclick="bet(${m.id},'a')">Obstaw ${m.a}</button>
-        <button onclick="bet(${m.id},'b')">Obstaw ${m.b}</button>` :
-        `<span>Zamknięty — wygrał: ${m.winner}</span>`}
+        <button onclick="bet(${m.id},'a')">Obstaw A</button>
+        <button onclick="bet(${m.id},'b')">Obstaw B</button>` :
+        `Zamknięty`}
       </div>`
     ).join("");
 
   if (me.admin) {
     admin.innerHTML = `
-      <h2>Panel admina</h2>
+      <h2>ADMIN</h2>
       <input id="a" placeholder="Gracz A">
       <input id="b" placeholder="Gracz B">
       <button onclick="addMatch()">Dodaj mecz</button>
@@ -100,21 +118,21 @@ async function load() {
 }
 
 async function bet(id, team) {
-  const amount = prompt("Kwota obstawienia");
-  await api("/api/bet", { matchId: id, team, amount: Number(amount) });
-  load();
+  const amount = prompt("Kwota");
+  try {
+    await post("/api/bet", { matchId: id, team, amount: Number(amount) });
+    load();
+  } catch (e) {
+    show(e.error || "Błąd obstawiania");
+  }
 }
 
 async function addMatch() {
-  await api("/api/admin/match", {
-    a: a.value,
-    b: b.value
-  });
+  await post("/api/admin/match", { a: a.value, b: b.value });
   load();
 }
 
 load();
 </script>
-
 </body>
 </html>
