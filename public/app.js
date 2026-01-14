@@ -1,3 +1,10 @@
+const auth = document.getElementById("auth");
+const panel = document.getElementById("panel");
+const msg = document.getElementById("msg");
+const meEl = document.getElementById("me");
+const matchesDiv = document.getElementById("matches");
+const adminDiv = document.getElementById("admin");
+
 async function api(url, data){
   const r = await fetch(url,{
     method:"POST",
@@ -40,7 +47,7 @@ async function load(){
 
   auth.style.display="none";
   panel.style.display="block";
-  me.innerText = `${me.login} | Saldo: ${me.balance} 💰`;
+  meEl.innerText = `${me.login} | Saldo: ${me.balance} 💰`;
 
   const matches = await fetch("/api/matches").then(r=>r.json());
   matchesDiv.innerHTML = matches.map(m=>`
@@ -53,9 +60,9 @@ async function load(){
   `).join("");
 
   if(me.admin){
-    admin.innerHTML = `
+    adminDiv.innerHTML = `
       <div class="card">
-        <h3>Admin</h3>
+        <h3>Panel admina</h3>
         <input id="a" placeholder="Gracz A">
         <input id="b" placeholder="Gracz B">
         <input id="oa" placeholder="Kurs A">
@@ -64,11 +71,14 @@ async function load(){
         <button onclick="addMatch()">Dodaj mecz</button>
       </div>
     `;
+  } else {
+    adminDiv.innerHTML = "";
   }
 }
 
 async function bet(id,pick){
   const amount = +prompt("Kwota");
+  if(!amount) return;
   await api("/api/bet",{matchId:id,pick,amount});
   load();
 }
