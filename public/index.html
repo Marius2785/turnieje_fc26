@@ -6,150 +6,30 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
 <div class="container">
-<h1>Turnieje FC 26</h1>
 
-<div id="auth" class="card">
-  <h2>Logowanie</h2>
-  <input id="loginInput" placeholder="login">
-  <input id="passwordInput" type="password" placeholder="hasło">
-  <button onclick="doLogin()">Zaloguj</button>
+<div id="auth">
+<h2>Logowanie</h2>
+<input id="login" placeholder="login">
+<input id="password" type="password" placeholder="hasło">
+<button onclick="login()">Zaloguj</button>
 
-  <h2>Rejestracja</h2>
-  <input id="rloginInput" placeholder="login">
-  <input id="rpasswordInput" type="password" placeholder="hasło">
-  <button onclick="doRegister()">Zarejestruj</button>
-
-  <p id="msg"></p>
+<h2>Rejestracja</h2>
+<input id="rlogin" placeholder="login">
+<input id="rpassword" type="password" placeholder="hasło">
+<button onclick="register()">Zarejestruj</button>
+<p id="msg"></p>
 </div>
 
 <div id="panel" style="display:none">
-  <div class="card">
-    <p id="me"></p>
-    <button onclick="logout()">Wyloguj</button>
-  </div>
+<p id="me"></p>
+<button onclick="logout()">Wyloguj</button>
 
-  <div id="matches"></div>
-  <div id="admin"></div>
-</div>
+<div id="matches"></div>
+<div id="admin"></div>
 </div>
 
-<script>
-const msg = document.getElementById("msg");
-
-async function api(url,data){
-  const r = await fetch(url,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(data)
-  });
-  const j = await r.json();
-  if(!r.ok) throw j;
-  return j;
-}
-
-async function doLogin(){
-  try{
-    await api("/api/login",{
-      login:loginInput.value,
-      password:passwordInput.value
-    });
-    load();
-  }catch(e){ msg.innerText=e.error; }
-}
-
-async function doRegister(){
-  try{
-    await api("/api/register",{
-      login:rloginInput.value,
-      password:rpasswordInput.value
-    });
-    msg.innerText="Zarejestrowano";
-  }catch(e){ msg.innerText=e.error; }
-}
-
-async function logout(){ await api("/api/logout",{}); load(); }
-
-async function load(){
-  const me = await fetch("/api/me").then(r=>r.json());
-
-  if(!me.logged){
-    auth.style.display="block";
-    panel.style.display="none";
-    return;
-  }
-
-  auth.style.display="none";
-  panel.style.display="block";
-  document.getElementById("me").innerText =
-    `${me.login} | Saldo: ${me.saldo} 💰`;
-
-  const matches = await fetch("/api/matches").then(r=>r.json());
-
-  matchesDiv.innerHTML = matches.map(m=>`
-    <div class="card match">
-      <h3>${m.a} vs ${m.b}</h3>
-      <p>Status: ${m.status}</p>
-
-      <p>
-        ${m.a} (${m.odds.a}) |
-        Remis (${m.odds.draw}) |
-        ${m.b} (${m.odds.b})
-      </p>
-
-      ${m.status==="open" ? `
-        <button onclick="bet(${m.id},'a')">${m.a}</button>
-        <button onclick="bet(${m.id},'draw')">Remis</button>
-        <button onclick="bet(${m.id},'b')">${m.b}</button>
-      ` : ``}
-
-      ${me.admin && m.status==="open" ? `
-        <hr>
-        <button onclick="finish(${m.id},'a')">✅ ${m.a}</button>
-        <button onclick="finish(${m.id},'draw')">🤝 Remis</button>
-        <button onclick="finish(${m.id},'b')">✅ ${m.b}</button>
-        <button onclick="cancel(${m.id})">❌ Anuluj</button>
-      ` : ``}
-    </div>
-  `).join("");
-
-  if(me.admin){
-    admin.innerHTML = `
-      <div class="card admin">
-        <h2>Panel Admina</h2>
-        <input id="a" placeholder="Gracz A">
-        <input id="b" placeholder="Gracz B">
-        <button onclick="addMatch()">Dodaj mecz</button>
-      </div>
-    `;
-  }
-}
-
-async function bet(id,t){
-  const amount = +prompt("Kwota zakładu");
-  if(!amount) return;
-  await api("/api/bet",{matchId:id,team:t,amount});
-  load();
-}
-
-async function addMatch(){
-  await api("/api/admin/match",{a:a.value,b:b.value});
-  load();
-}
-
-async function finish(id,r){
-  await api("/api/admin/finish",{id,result:r});
-  load();
-}
-
-async function cancel(id){
-  await api("/api/admin/cancel",{id});
-  load();
-}
-
-const matchesDiv = document.getElementById("matches");
-load();
-</script>
+<script src="app.js"></script>
+</div>
 </body>
 </html>
