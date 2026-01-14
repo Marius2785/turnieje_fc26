@@ -1,8 +1,8 @@
 import express from "express";
 import session from "express-session";
+import { db } from "./db.js";
 import path from "path";
 import { fileURLToPath } from "url";
-import { db } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -22,8 +22,7 @@ app.use(express.static(path.join(__dirname, "../public")));
 
 app.post("/api/register", (req, res) => {
   const { login, password } = req.body;
-  if (!login || !password)
-    return res.json({ error: "Brak danych" });
+  if (!login || !password) return res.json({ error: "Brak danych" });
 
   db.run(
     "INSERT INTO users (login,password) VALUES (?,?)",
@@ -42,7 +41,7 @@ app.post("/api/login", (req, res) => {
     "SELECT * FROM users WHERE login=? AND password=?",
     [login, password],
     (err, user) => {
-      if (!user) return res.json({ error: "Złe dane logowania" });
+      if (!user) return res.json({ error: "Złe dane" });
       req.session.user = user;
       res.json({ ok: true });
     }
@@ -54,9 +53,7 @@ app.post("/api/logout", (req, res) => {
 });
 
 app.get("/api/me", (req, res) => {
-  if (!req.session.user)
-    return res.json({ logged: false });
-
+  if (!req.session.user) return res.json({ logged: false });
   res.json({
     logged: true,
     login: req.session.user.login,
@@ -68,12 +65,13 @@ app.get("/api/me", (req, res) => {
 /* ===== MATCHES ===== */
 
 app.get("/api/matches", (req, res) => {
-  db.all("SELECT * FROM matches", (e, rows) => res.json(rows));
+  db.all("SELECT * FROM matches WHERE status='open'", (e, rows) => {
+    res.json(rows);
+  });
 });
 
 app.post("/api/bet", (req, res) => {
-  if (!req.session.user)
-    return res.json({ error: "Zaloguj się" });
+  if (!req.session.user) return res.json({ error: "Brak loginu" });
 
   const { matchId, pick, amount } = req.body;
 
@@ -90,6 +88,13 @@ app.post("/api/bet", (req, res) => {
     [amount, req.session.user.id]
   );
 
+  // dynamiczne kursy
+  const field = pick === "a" ? "oddsA" : pick === "b" ? "oddsB" : "oddsD";
+  db.run(
+    `UPDATE matches SET ${field}=${field}-0.1 WHERE id=?`,
+    [matchId]
+  );
+
   req.session.user.balance -= amount;
   res.json({ ok: true });
 });
@@ -104,9 +109,8 @@ function admin(req, res, next) {
 
 app.post("/api/admin/match", admin, (req, res) => {
   const { a, b, oddsA, oddsD, oddsB } = req.body;
-
   db.run(
-    "INSERT INTO matches (a,b,oddsA,oddsD,oddsB) VALUES (?,?,?,?,?)",
+    "INSERT INTO matches (a,b,oddsA,oddsD,oddsB,status) VALUES (?,?,?,?,?,'open')",
     [a, b, oddsA, oddsD, oddsB],
     () => res.json({ ok: true })
   );
@@ -116,23 +120,22 @@ app.post("/api/admin/finish", admin, (req, res) => {
   const { id, result } = req.body;
 
   db.all("SELECT * FROM bets WHERE match_id=?", [id], (e, bets) => {
-    bets.forEach(b => {
-      db.get("SELECT * FROM matches WHERE id=?", [id], (e, m) => {
+    db.get("SELECT * FROM matches WHERE id=?", [id], (e, m) => {
+      bets.forEach(b => {
         if (b.pick === result) {
           const odd =
             result === "a" ? m.oddsA :
-            result === "b" ? m.oddsB : m.oddsD;
-
+            result === "b" ? m.oddsB :
+            m.oddsD;
           const payout = Math.floor(b.amount * odd);
           db.run("UPDATE users SET balance=balance+? WHERE id=?", [payout, b.user_id]);
         }
       });
+
+      db.run("DELETE FROM bets WHERE match_id=?", [id]);
+      db.run("DELETE FROM matches WHERE id=?", [id]);
+      res.json({ ok: true });
     });
-
-    db.run("DELETE FROM matches WHERE id=?", [id]);
-    db.run("DELETE FROM bets WHERE match_id=?", [id]);
-
-    res.json({ ok: true });
   });
 });
 
