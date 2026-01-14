@@ -6,30 +6,38 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
 <div class="container">
+  <h1>Turnieje FC 26</h1>
 
-<div id="auth">
-<h2>Logowanie</h2>
-<input id="login" placeholder="login">
-<input id="password" type="password" placeholder="hasło">
-<button onclick="login()">Zaloguj</button>
+  <div id="auth" class="card">
+    <h2>Logowanie</h2>
+    <input id="login" placeholder="login">
+    <input id="password" type="password" placeholder="hasło">
+    <button onclick="loginUser()">Zaloguj</button>
 
-<h2>Rejestracja</h2>
-<input id="rlogin" placeholder="login">
-<input id="rpassword" type="password" placeholder="hasło">
-<button onclick="register()">Zarejestruj</button>
-<p id="msg"></p>
+    <h2>Rejestracja</h2>
+    <input id="rlogin" placeholder="login">
+    <input id="rpassword" type="password" placeholder="hasło">
+    <button onclick="registerUser()">Zarejestruj</button>
+
+    <p id="msg"></p>
+  </div>
+
+  <div id="panel" style="display:none">
+    <div class="card">
+      <p id="me"></p>
+      <button onclick="logout()">Wyloguj</button>
+    </div>
+
+    <div id="matches"></div>
+
+    <div id="admin"></div>
+  </div>
 </div>
 
-<div id="panel" style="display:none">
-<p id="me"></p>
-<button onclick="logout()">Wyloguj</button>
-
-<div id="matches"></div>
-<div id="admin"></div>
-</div>
+<div class="footer">by chomiczekk_</div>
 
 <script src="app.js"></script>
-</div>
 </body>
 </html>
