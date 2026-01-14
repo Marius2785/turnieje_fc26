@@ -1,62 +1,41 @@
 body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #0f172a;
-  color: #e5e7eb;
-}
-
-h1, h2 {
-  text-align: center;
+  background:#0f172a;
+  font-family:Arial;
+  color:#fff;
 }
 
 .container {
-  max-width: 900px;
-  margin: auto;
-  padding: 20px;
+  width:400px;
+  margin:40px auto;
 }
 
 .card {
-  background: #020617;
-  border-radius: 10px;
-  padding: 15px;
-  margin-bottom: 15px;
-  box-shadow: 0 0 15px rgba(0,0,0,.6);
+  background:#1e293b;
+  padding:15px;
+  margin-bottom:15px;
+  border-radius:8px;
 }
 
-input, button, select {
-  width: 100%;
-  padding: 10px;
-  margin: 6px 0;
-  border-radius: 6px;
-  border: none;
-}
-
-input, select {
-  background: #020617;
-  color: white;
-  border: 1px solid #334155;
+input,button {
+  width:100%;
+  padding:8px;
+  margin:5px 0;
 }
 
 button {
-  background: #2563eb;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
+  background:#22c55e;
+  border:none;
+  cursor:pointer;
 }
-
-button.red { background: #dc2626; }
-button.green { background: #16a34a; }
-button.gray { background: #475569; }
-
-button:hover { opacity: .9 }
 
 .match {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
+  margin-bottom:10px;
 }
 
-.admin {
-  border: 2px solid #2563eb;
+.footer {
+  position:fixed;
+  bottom:5px;
+  left:5px;
+  font-size:12px;
+  color:#94a3b8;
 }
