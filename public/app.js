@@ -1,58 +1,97 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const loginForm = document.getElementById("login-form");
-  const registerForm = document.getElementById("register-form");
-  const logoutBtn = document.getElementById("logout");
+const msg = document.getElementById("msg");
 
-  if (loginForm) {
-    loginForm.addEventListener("submit", async e => {
-      e.preventDefault();
+async function api(url, data) {
+  const r = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+  return r.json();
+}
 
-      const login = document.getElementById("login").value;
-      const password = document.getElementById("password").value;
+async function login() {
+  const r = await api("/api/login",{login:login.value,password:password.value});
+  if(r.error) msg.innerText=r.error; else load();
+}
 
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login, password })
-      });
+async function register() {
+  const r = await api("/api/register",{login:rlogin.value,password:rpassword.value});
+  msg.innerText = r.error || "Zarejestrowano";
+}
 
-      const data = await res.json();
+async function logout(){ await api("/api/logout",{}); load(); }
 
-      if (!res.ok) {
-        alert(data.error || "Błąd logowania");
-      } else {
-        location.reload();
-      }
-    });
+async function load(){
+  const me = await fetch("/api/me").then(r=>r.json());
+  if(!me.logged){
+    auth.style.display="block";
+    panel.style.display="none";
+    return;
   }
 
-  if (registerForm) {
-    registerForm.addEventListener("submit", async e => {
-      e.preventDefault();
+  auth.style.display="none";
+  panel.style.display="block";
+  document.getElementById("me").innerText =
+    `${me.login} | ${me.balance} 💰`;
 
-      const login = document.getElementById("reg-login").value;
-      const password = document.getElementById("reg-password").value;
+  const matches = await fetch("/api/matches").then(r=>r.json());
+  matchesDiv.innerHTML = matches.map(m=>`
+    <div>
+      <b>${m.a} vs ${m.b}</b><br>
+      <button onclick="bet(${m.id},'a')">${m.a} (${m.oddsA})</button>
+      <button onclick="bet(${m.id},'d')">Remis (${m.oddsD})</button>
+      <button onclick="bet(${m.id},'b')">${m.b} (${m.oddsB})</button>
+    </div>
+  `).join("");
 
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login, password })
-      });
+  if(me.admin){
+    admin.innerHTML = `
+      <h3>Admin</h3>
+      <input id="a" placeholder="A">
+      <input id="b" placeholder="B">
+      <input id="oa" placeholder="kurs A">
+      <input id="od" placeholder="kurs D">
+      <input id="ob" placeholder="kurs B">
+      <button onclick="addMatch()">Dodaj</button>
 
-      const data = await res.json();
+      <input id="mid" placeholder="ID meczu">
+      <select id="res">
+        <option value="a">A</option>
+        <option value="d">Remis</option>
+        <option value="b">B</option>
+      </select>
+      <button onclick="finish()">Zakończ</button>
 
-      if (!res.ok) {
-        alert(data.error || "Błąd rejestracji");
-      } else {
-        alert("Konto utworzone – możesz się zalogować");
-      }
-    });
+      <h4>Saldo</h4>
+      <input id="ul" placeholder="login">
+      <input id="ub" placeholder="saldo">
+      <button onclick="setBal()">Zapisz</button>
+    `;
   }
+}
 
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", async () => {
-      await fetch("/api/logout", { method: "POST" });
-      location.reload();
-    });
-  }
-});
+async function bet(id,p){
+  const a = prompt("Kwota");
+  await api("/api/bet",{matchId:id,pick:p,amount:+a});
+  load();
+}
+
+async function addMatch(){
+  await api("/api/admin/match",{
+    a:a.value,b:b.value,
+    oddsA:+oa.value,oddsD:+od.value,oddsB:+ob.value
+  });
+  load();
+}
+
+async function finish(){
+  await api("/api/admin/finish",{id:+mid.value,result:res.value});
+  load();
+}
+
+async function setBal(){
+  await api("/api/admin/balance",{login:ul.value,amount:+ub.value});
+  load();
+}
+
+load();
