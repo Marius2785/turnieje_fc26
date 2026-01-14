@@ -22,10 +22,13 @@ app.use(express.static(path.join(__dirname, "../public")));
 
 app.post("/api/register", (req, res) => {
   const { login, password } = req.body;
-  if (!login || !password) return res.json({ error: "Brak danych" });
+
+  if (!login || !password) {
+    return res.json({ error: "Brak danych" });
+  }
 
   db.run(
-    "INSERT INTO users (login,password) VALUES (?,?)",
+    "INSERT INTO users (login, password, balance, role) VALUES (?, ?, 1000, 'user')",
     [login, password],
     err => {
       if (err) return res.json({ error: "Login zajęty" });
@@ -36,12 +39,29 @@ app.post("/api/register", (req, res) => {
 
 app.post("/api/login", (req, res) => {
   const { login, password } = req.body;
+
+  if (!login || !password) {
+    return res.json({ error: "Brak danych" });
+  }
+
   db.get(
-    "SELECT * FROM users WHERE login=? AND password=?",
-    [login, password],
+    "SELECT * FROM users WHERE login = ?",
+    [login],
     (err, user) => {
+      if (err) return res.json({ error: "Błąd serwera" });
       if (!user) return res.json({ error: "Złe dane" });
-      req.session.user = user;
+
+      if (user.password !== password) {
+        return res.json({ error: "Złe dane" });
+      }
+
+      req.session.user = {
+        id: user.id,
+        login: user.login,
+        balance: user.balance,
+        role: user.role
+      };
+
       res.json({ ok: true });
     }
   );
@@ -53,6 +73,7 @@ app.post("/api/logout", (req, res) => {
 
 app.get("/api/me", (req, res) => {
   if (!req.session.user) return res.json({ logged: false });
+
   res.json({
     logged: true,
     login: req.session.user.login,
@@ -65,7 +86,7 @@ app.get("/api/me", (req, res) => {
 
 app.get("/api/matches", (req, res) => {
   db.all(
-    "SELECT * FROM matches WHERE status='open'",
+    "SELECT * FROM matches WHERE status = 'open'",
     (err, rows) => res.json(rows)
   );
 });
@@ -75,16 +96,17 @@ app.post("/api/bet", (req, res) => {
 
   const { matchId, pick, amount } = req.body;
 
-  if (req.session.user.balance < amount)
+  if (req.session.user.balance < amount) {
     return res.json({ error: "Brak środków" });
+  }
 
   db.run(
-    "INSERT INTO bets (user_id,match_id,pick,amount) VALUES (?,?,?,?)",
+    "INSERT INTO bets (user_id, match_id, pick, amount) VALUES (?,?,?,?)",
     [req.session.user.id, matchId, pick, amount]
   );
 
   db.run(
-    "UPDATE users SET balance=balance-? WHERE id=?",
+    "UPDATE users SET balance = balance - ? WHERE id = ?",
     [amount, req.session.user.id]
   );
 
@@ -95,15 +117,17 @@ app.post("/api/bet", (req, res) => {
 /* ===== ADMIN ===== */
 
 function admin(req, res, next) {
-  if (!req.session.user || req.session.user.role !== "admin")
+  if (!req.session.user || req.session.user.role !== "admin") {
     return res.json({ error: "Brak dostępu" });
+  }
   next();
 }
 
 app.post("/api/admin/match", admin, (req, res) => {
   const { a, b, oddsA, oddsD, oddsB } = req.body;
+
   db.run(
-    "INSERT INTO matches (a,b,oddsA,oddsD,oddsB,status) VALUES (?,?,?,?,?,'open')",
+    "INSERT INTO matches (a, b, oddsA, oddsD, oddsB, status) VALUES (?,?,?,?,?,'open')",
     [a, b, oddsA, oddsD, oddsB],
     () => res.json({ ok: true })
   );
@@ -112,33 +136,45 @@ app.post("/api/admin/match", admin, (req, res) => {
 app.post("/api/admin/finish", admin, (req, res) => {
   const { id, result } = req.body;
 
-  db.all("SELECT * FROM bets WHERE match_id=?", [id], (e, bets) => {
-    bets.forEach(b => {
-      db.get("SELECT * FROM matches WHERE id=?", [id], (e, m) => {
+  db.all("SELECT * FROM bets WHERE match_id = ?", [id], (e, bets) => {
+    db.get("SELECT * FROM matches WHERE id = ?", [id], (e, m) => {
+
+      bets.forEach(b => {
         let win = false;
         if (b.pick === result) win = true;
 
         if (win) {
-          const odd = result === "a" ? m.oddsA : result === "b" ? m.oddsB : m.oddsD;
+          const odd =
+            result === "a" ? m.oddsA :
+            result === "b" ? m.oddsB :
+            m.oddsD;
+
           const payout = Math.floor(b.amount * odd);
-          db.run("UPDATE users SET balance=balance+? WHERE id=?", [payout, b.user_id]);
+          db.run(
+            "UPDATE users SET balance = balance + ? WHERE id = ?",
+            [payout, b.user_id]
+          );
         }
       });
-    });
 
-    db.run("DELETE FROM matches WHERE id=?", [id]);
-    db.run("DELETE FROM bets WHERE match_id=?", [id]);
-    res.json({ ok: true });
+      db.run("DELETE FROM matches WHERE id = ?", [id]);
+      db.run("DELETE FROM bets WHERE match_id = ?", [id]);
+
+      res.json({ ok: true });
+    });
   });
 });
 
 app.post("/api/admin/balance", admin, (req, res) => {
   const { login, amount } = req.body;
+
   db.run(
-    "UPDATE users SET balance=? WHERE login=?",
+    "UPDATE users SET balance = ? WHERE login = ?",
     [amount, login],
     () => res.json({ ok: true })
   );
 });
 
-app.listen(process.env.PORT || 3000, () => console.log("ONLINE"));
+app.listen(process.env.PORT || 3000, () =>
+  console.log("SERVER ONLINE")
+);
