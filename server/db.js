@@ -1,6 +1,6 @@
 import sqlite3 from "sqlite3";
 
-export const db = new sqlite3.Database("database.sqlite");
+export const db = new sqlite3.Database("db.sqlite");
 
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -18,7 +18,7 @@ db.serialize(() => {
     oddsA REAL,
     oddsD REAL,
     oddsB REAL,
-    status TEXT
+    status TEXT DEFAULT 'open'
   )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS bets (
@@ -29,9 +29,9 @@ db.serialize(() => {
     amount INTEGER
   )`);
 
-  // ADMIN – tworzy się sam
+  // ADMIN – tworzy się tylko raz
   db.run(
     `INSERT OR IGNORE INTO users (login,password,role,balance)
-     VALUES ('administrator','małpyigoryle23_','admin',100000)`
+     VALUES ('administrator','małpyigoryle23_','admin',999999)`
   );
 });
