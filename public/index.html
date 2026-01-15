@@ -1,35 +1,28 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-<meta charset="UTF-8">
-<title>Turnieje FC 26</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <title>Turnieje FC 26</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h1>Turnieje FC 26</h1>
+<header>Turnieje FC 26</header>
 
-<div id="auth">
-  <input id="login" placeholder="login">
-  <input id="password" type="password" placeholder="hasło">
-  <button onclick="loginUser()">Zaloguj</button>
+<table>
+  <thead>
+    <tr>
+      <th>Mecz</th>
+      <th>Data</th>
+      <th>Wynik</th>
+      <th>Kursy</th>
+      <th>Akcje</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
-  <input id="rlogin" placeholder="login">
-  <input id="rpassword" type="password" placeholder="hasło">
-  <button onclick="registerUser()">Rejestracja</button>
-
-  <p id="msg"></p>
-</div>
-
-<div id="panel" style="display:none">
-  <p id="me"></p>
-  <button onclick="logout()">Wyloguj</button>
-
-  <div id="matches"></div>
-  <div id="admin"></div>
-</div>
-
-<div class="credit">by chomiczekk_</div>
+<div class="footer">by chomiczekk_</div>
 
 <script src="app.js"></script>
 </body>
