@@ -1,11 +1,13 @@
 import express from "express";
 import session from "express-session";
+import { db } from "./db.js";
 import path from "path";
 import { fileURLToPath } from "url";
-import { db } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+
+/* ================= BASIC ================= */
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -18,13 +20,15 @@ app.use(session({
 
 app.use(express.static(path.join(__dirname, "../public")));
 
-/* AUTH */
+/* ================= AUTH ================= */
+
 app.post("/api/register", (req, res) => {
   const { login, password } = req.body;
-  if (!login || !password) return res.json({ error: "Brak danych" });
+  if (!login || !password)
+    return res.json({ error: "Brak danych" });
 
   db.run(
-    "INSERT INTO users (login,password) VALUES (?,?)",
+    "INSERT INTO users (login,password,balance,role) VALUES (?,?,1000,'user')",
     [login, password],
     err => {
       if (err) return res.json({ error: "Login zajęty" });
@@ -35,10 +39,11 @@ app.post("/api/register", (req, res) => {
 
 app.post("/api/login", (req, res) => {
   const { login, password } = req.body;
+
   db.get(
     "SELECT * FROM users WHERE login=? AND password=?",
     [login, password],
-    (e, user) => {
+    (err, user) => {
       if (!user) return res.json({ error: "Złe dane" });
       req.session.user = user;
       res.json({ ok: true });
@@ -46,8 +51,14 @@ app.post("/api/login", (req, res) => {
   );
 });
 
+app.post("/api/logout", (req, res) => {
+  req.session.destroy(() => res.json({ ok: true }));
+});
+
 app.get("/api/me", (req, res) => {
-  if (!req.session.user) return res.json({ logged: false });
+  if (!req.session.user)
+    return res.json({ logged: false });
+
   res.json({
     logged: true,
     login: req.session.user.login,
@@ -56,100 +67,115 @@ app.get("/api/me", (req, res) => {
   });
 });
 
-app.post("/api/logout", (req, res) => {
-  req.session.destroy(() => res.json({ ok: true }));
+/* ================= MATCHES ================= */
+
+// POBIERANIE MECZÓW (z kursami)
+app.get("/api/matches", (req, res) => {
+  db.all(
+    "SELECT * FROM matches WHERE status='open'",
+    (err, rows) => res.json(rows)
+  );
 });
 
-/* MATCHES */
-app.get("/api/matches", (req, res) => {
-  db.all("SELECT * FROM matches WHERE status='open'", (e, rows) => {
-    res.json(rows);
-  });
-});
+/* ================= BETTING ================= */
+
+// OBLICZANIE KURSÓW (BUF0R 8%)
+function calculateOdds(totalA, totalB) {
+  const buffer = 0.08;
+  const total = totalA + totalB + 1;
+
+  let oddsA = (total / (totalA + 1)) * (1 - buffer);
+  let oddsB = (total / (totalB + 1)) * (1 - buffer);
+
+  oddsA = Math.max(1.2, oddsA);
+  oddsB = Math.max(1.2, oddsB);
+
+  return {
+    oddsA: Number(oddsA.toFixed(2)),
+    oddsB: Number(oddsB.toFixed(2))
+  };
+}
 
 app.post("/api/bet", (req, res) => {
-  if (!req.session.user) return res.json({ error: "Brak loginu" });
+  if (!req.session.user)
+    return res.json({ error: "Brak loginu" });
 
   const { matchId, pick, amount } = req.body;
+  const stake = Number(amount);
 
-  if (req.session.user.balance < amount)
+  if (!stake || stake <= 0)
+    return res.json({ error: "Zła kwota" });
+
+  if (req.session.user.balance < stake)
     return res.json({ error: "Brak środków" });
 
-  db.run(
-    "INSERT INTO bets (user_id,match_id,pick,amount) VALUES (?,?,?,?)",
-    [req.session.user.id, matchId, pick, amount]
-  );
+  db.get(
+    "SELECT * FROM matches WHERE id=? AND status='open'",
+    [matchId],
+    (err, match) => {
+      if (!match)
+        return res.json({ error: "Mecz nie istnieje" });
 
-  db.run(
-    "UPDATE users SET balance=balance-? WHERE id=?",
-    [amount, req.session.user.id]
-  );
+      db.run(
+        "INSERT INTO bets (user_id,match_id,pick,amount) VALUES (?,?,?,?)",
+        [req.session.user.id, matchId, pick, stake]
+      );
 
-  req.session.user.balance -= amount;
-  res.json({ ok: true });
+      db.run(
+        "UPDATE users SET balance=balance-? WHERE id=?",
+        [stake, req.session.user.id]
+      );
+
+      req.session.user.balance -= stake;
+
+      // PRZELICZANIE KURSÓW
+      db.all(
+        "SELECT pick, SUM(amount) as sum FROM bets WHERE match_id=? GROUP BY pick",
+        [matchId],
+        (e, rows) => {
+          let totalA = 0;
+          let totalB = 0;
+
+          rows.forEach(r => {
+            if (r.pick === "a") totalA = r.sum;
+            if (r.pick === "b") totalB = r.sum;
+          });
+
+          const odds = calculateOdds(totalA, totalB);
+
+          db.run(
+            "UPDATE matches SET oddsA=?, oddsB=? WHERE id=?",
+            [odds.oddsA, odds.oddsB, matchId]
+          );
+
+          res.json({ ok: true });
+        }
+      );
+    }
+  );
 });
 
-/* ADMIN */
+/* ================= ADMIN ================= */
+
 function admin(req, res, next) {
   if (!req.session.user || req.session.user.role !== "admin")
     return res.json({ error: "Brak dostępu" });
   next();
 }
 
+// DODAWANIE MECZU
 app.post("/api/admin/match", admin, (req, res) => {
-  const { a, b, oddsA, oddsD, oddsB } = req.body;
+  const { a, b } = req.body;
+
   db.run(
-    "INSERT INTO matches (a,b,oddsA,oddsD,oddsB) VALUES (?,?,?,?,?)",
-    [a, b, oddsA, oddsD, oddsB],
+    "INSERT INTO matches (a,b,oddsA,oddsB,status) VALUES (?,?,?,?, 'open')",
+    [a, b, 2.0, 2.0],
     () => res.json({ ok: true })
   );
 });
 
-app.post("/api/admin/finish", admin, (req, res) => {
-  const { id, result } = req.body;
+/* ================= START ================= */
 
-  db.all("SELECT * FROM bets WHERE match_id=?", [id], (e, bets) => {
-    db.get("SELECT * FROM matches WHERE id=?", [id], (e, m) => {
-      bets.forEach(b => {
-        if (b.pick === result) {
-          const odd =
-            result === "a" ? m.oddsA :
-            result === "b" ? m.oddsB : m.oddsD;
-          const payout = Math.floor(b.amount * odd);
-          db.run(
-            "UPDATE users SET balance=balance+? WHERE id=?",
-            [payout, b.user_id]
-          );
-        }
-      });
-
-      db.run("DELETE FROM bets WHERE match_id=?", [id]);
-      db.run("DELETE FROM matches WHERE id=?", [id]);
-      res.json({ ok: true });
-    });
-  });
-});
-
-app.post("/api/admin/balance", admin, (req, res) => {
-  const { login, amount } = req.body;
-  db.run(
-    "UPDATE users SET balance=? WHERE login=?",
-    [amount, login],
-    () => res.json({ ok: true })
-  );
-});
-
-db.get(
-  "SELECT * FROM users WHERE login='administrator'",
-  (err, user) => {
-    if (!user) {
-      db.run(
-        "INSERT INTO users (login, password, balance, role) VALUES (?,?,?,?)",
-        ["administrator", "małpyigoryle23_", 100000, "admin"]
-      );
-      console.log("✔ Konto administrator utworzone");
-    }
-  }
+app.listen(process.env.PORT || 3000, () =>
+  console.log("ONLINE")
 );
-
-app.listen(process.env.PORT || 3000, () => console.log("ONLINE"));
