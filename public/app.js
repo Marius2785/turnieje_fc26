@@ -1,75 +1,39 @@
-async function api(url, data) {
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data)
-  });
-  return r.json();
-}
-
-async function loginUser() {
-  const res = await api("/api/login", {
-    login: login.value,
-    password: password.value
-  });
-  if (res.error) msg.innerText = res.error;
-  else load();
-}
-
-async function registerUser() {
-  const res = await api("/api/register", {
-    login: rlogin.value,
-    password: rpassword.value
-  });
-  msg.innerText = res.ok ? "Zarejestrowano" : res.error;
-}
-
-async function logout() {
-  await api("/api/logout", {});
-  location.reload();
-}
-
 async function load() {
-  const meRes = await fetch("/api/me").then(r => r.json());
-  if (!meRes.logged) return;
-
-  auth.style.display = "none";
-  panel.style.display = "block";
-  me.innerText = `${meRes.login} | ${meRes.balance} 💰`;
+  const me = await fetch("/api/me").then(r => r.json());
+  if (!me.logged) return;
 
   const matches = await fetch("/api/matches").then(r => r.json());
-  matchesDiv.innerHTML = matches.map(m => `
-    <div class="card">
-      <b>${m.a} vs ${m.b}</b><br>
-      <button onclick="bet(${m.id},'a')">${m.a} (${m.oddsA})</button>
-      <button onclick="bet(${m.id},'d')">Remis (${m.oddsD})</button>
-      <button onclick="bet(${m.id},'b')">${m.b} (${m.oddsB})</button>
-    </div>
-  `).join("");
+  const tbody = document.querySelector("tbody");
+  tbody.innerHTML = "";
 
-  if (meRes.admin) {
-    admin.innerHTML = `
-      <h3>ADMIN</h3>
-      <input id="a"><input id="b">
-      <input id="oa" placeholder="A"><input id="od" placeholder="D"><input id="ob" placeholder="B">
-      <button onclick="addMatch()">Dodaj mecz</button>
+  matches.forEach(m => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${m.a}<br>vs<br>${m.b}</td>
+      <td>-</td>
+      <td>-</td>
+      <td>
+        <span class="kurs">1 ${m.oddsA}</span>
+        <span class="kurs">X ${m.oddsD}</span>
+        <span class="kurs">2 ${m.oddsB}</span>
+      </td>
+      <td>
+        ${me.admin ? `
+          <button class="btn green" onclick="finish(${m.id},'a')">1</button>
+          <button class="btn yellow" onclick="finish(${m.id},'d')">X</button>
+          <button class="btn red" onclick="finish(${m.id},'b')">2</button>
+        ` : ""}
+      </td>
     `;
-  }
+    tbody.appendChild(tr);
+  });
 }
 
-async function bet(id, pick) {
-  const amount = prompt("Kwota");
-  await api("/api/bet", { matchId: id, pick, amount: +amount });
-  load();
-}
-
-async function addMatch() {
-  await api("/api/admin/match", {
-    a: a.value,
-    b: b.value,
-    oddsA: oa.value,
-    oddsD: od.value,
-    oddsB: ob.value
+async function finish(id, r) {
+  await fetch("/api/admin/finish", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, result: r })
   });
   load();
 }
