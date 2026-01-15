@@ -1,29 +1,220 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8">
-  <title>Turnieje FC 26</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<title>Turnieje FC 26</title>
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: radial-gradient(circle at top, #0f2a3a, #08151f);
+  color: #fff;
+}
+
+h1 {
+  text-align: center;
+  margin-top: 30px;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 40px auto;
+}
+
+.card {
+  background: rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+input, button, select {
+  width: 100%;
+  padding: 10px;
+  margin: 6px 0;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+}
+
+input {
+  background: #0c1f2c;
+  color: #fff;
+}
+
+button {
+  cursor: pointer;
+  background: #2d6cdf;
+  color: #fff;
+  font-weight: bold;
+}
+
+button.green { background:#28c76f }
+button.red { background:#ea5455 }
+button.gray { background:#777 }
+
+.match {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.match b {
+  font-size: 16px;
+}
+
+.odds button {
+  width: auto;
+  margin-right: 6px;
+}
+
+footer {
+  position: fixed;
+  left: 10px;
+  bottom: 6px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+</style>
 </head>
+
 <body>
 
-<header>Turnieje FC 26</header>
+<h1>Turnieje FC 26</h1>
 
-<table>
-  <thead>
-    <tr>
-      <th>Mecz</th>
-      <th>Data</th>
-      <th>Wynik</th>
-      <th>Kursy</th>
-      <th>Akcje</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+<div class="container">
 
-<div class="footer">by chomiczekk_</div>
+  <!-- LOGOWANIE -->
+  <div id="auth" class="card">
+    <h2>Logowanie</h2>
+    <input id="login" placeholder="login">
+    <input id="password" type="password" placeholder="hasło">
+    <button onclick="doLogin()">Zaloguj</button>
 
-<script src="app.js"></script>
+    <h3>Rejestracja</h3>
+    <input id="rlogin" placeholder="login">
+    <input id="rpassword" type="password" placeholder="hasło">
+    <button onclick="doRegister()">Zarejestruj</button>
+
+    <p id="msg"></p>
+  </div>
+
+  <!-- PANEL -->
+  <div id="panel" style="display:none">
+
+    <div class="card">
+      <span id="me"></span>
+      <button class="gray" onclick="logout()">Wyloguj</button>
+    </div>
+
+    <div id="matches"></div>
+
+    <div id="admin"></div>
+
+  </div>
+</div>
+
+<footer>by chomiczekk_</footer>
+
+<script>
+const msg = document.getElementById("msg");
+
+async function api(url, data) {
+  const r = await fetch(url,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(data)
+  });
+  return r.json();
+}
+
+async function doLogin(){
+  const r = await api("/api/login",{
+    login:login.value,
+    password:password.value
+  });
+  if(r.error) msg.innerText = r.error;
+  else load();
+}
+
+async function doRegister(){
+  const r = await api("/api/register",{
+    login:rlogin.value,
+    password:rpassword.value
+  });
+  msg.innerText = r.error || "Zarejestrowano";
+}
+
+async function logout(){
+  await api("/api/logout",{});
+  load();
+}
+
+async function load(){
+  const me = await fetch("/api/me").then(r=>r.json());
+
+  if(!me.logged){
+    auth.style.display="block";
+    panel.style.display="none";
+    return;
+  }
+
+  auth.style.display="none";
+  panel.style.display="block";
+
+  document.getElementById("me").innerText =
+    me.login+" | Saldo: "+me.balance+" 💰";
+
+  const matches = await fetch("/api/matches").then(r=>r.json());
+  document.getElementById("matches").innerHTML =
+    matches.map(m=>`
+      <div class="card match">
+        <div>
+          <b>${m.a} vs ${m.b}</b><br>
+          Status: OTWARTY
+        </div>
+        <div class="odds">
+          <button onclick="bet(${m.id},'a')">${m.a} (${m.oddsA})</button>
+          <button onclick="bet(${m.id},'d')">Remis (${m.oddsD})</button>
+          <button onclick="bet(${m.id},'b')">${m.b} (${m.oddsB})</button>
+        </div>
+      </div>
+    `).join("");
+
+  if(me.admin){
+    admin.innerHTML = `
+      <div class="card">
+        <h3>Panel admina</h3>
+        <input id="a" placeholder="Gracz A">
+        <input id="b" placeholder="Gracz B">
+        <input id="oa" placeholder="Kurs A">
+        <input id="od" placeholder="Kurs Remis">
+        <input id="ob" placeholder="Kurs B">
+        <button onclick="addMatch()">Dodaj mecz</button>
+      </div>
+    `;
+  }
+}
+
+async function bet(id,pick){
+  const amount = prompt("Kwota");
+  await api("/api/bet",{matchId:id,pick,amount:+amount});
+  load();
+}
+
+async function addMatch(){
+  await api("/api/admin/match",{
+    a:a.value,
+    b:b.value,
+    oddsA:+oa.value,
+    oddsD:+od.value,
+    oddsB:+ob.value
+  });
+  load();
+}
+
+load();
+</script>
+
 </body>
 </html>
