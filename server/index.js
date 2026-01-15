@@ -139,4 +139,17 @@ app.post("/api/admin/balance", admin, (req, res) => {
   );
 });
 
+db.get(
+  "SELECT * FROM users WHERE login='administrator'",
+  (err, user) => {
+    if (!user) {
+      db.run(
+        "INSERT INTO users (login, password, balance, role) VALUES (?,?,?,?)",
+        ["administrator", "małpyigoryle23_", 100000, "admin"]
+      );
+      console.log("✔ Konto administrator utworzone");
+    }
+  }
+);
+
 app.listen(process.env.PORT || 3000, () => console.log("ONLINE"));
