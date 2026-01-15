@@ -69,7 +69,6 @@ app.get("/api/me", (req, res) => {
 
 /* ================= MATCHES ================= */
 
-// POBIERANIE MECZÓW (z kursami)
 app.get("/api/matches", (req, res) => {
   db.all(
     "SELECT * FROM matches WHERE status='open'",
@@ -77,24 +76,24 @@ app.get("/api/matches", (req, res) => {
   );
 });
 
-/* ================= BETTING ================= */
+/* ================= ODDS ================= */
 
-// OBLICZANIE KURSÓW (BUF0R 8%)
-function calculateOdds(totalA, totalB) {
+// bufor 8% – stabilne kursy przy ~15 osobach
+function calculateOdds(a, d, b) {
   const buffer = 0.08;
-  const total = totalA + totalB + 1;
+  const total = a + d + b + 1;
 
-  let oddsA = (total / (totalA + 1)) * (1 - buffer);
-  let oddsB = (total / (totalB + 1)) * (1 - buffer);
-
-  oddsA = Math.max(1.2, oddsA);
-  oddsB = Math.max(1.2, oddsB);
+  const calc = x =>
+    Math.max(1.2, (total / (x + 1)) * (1 - buffer));
 
   return {
-    oddsA: Number(oddsA.toFixed(2)),
-    oddsB: Number(oddsB.toFixed(2))
+    oddsA: Number(calc(a).toFixed(2)),
+    oddsD: Number(calc(d).toFixed(2)),
+    oddsB: Number(calc(b).toFixed(2))
   };
 }
+
+/* ================= BET ================= */
 
 app.post("/api/bet", (req, res) => {
   if (!req.session.user)
@@ -128,24 +127,24 @@ app.post("/api/bet", (req, res) => {
 
       req.session.user.balance -= stake;
 
-      // PRZELICZANIE KURSÓW
+      // przeliczanie kursów
       db.all(
-        "SELECT pick, SUM(amount) as sum FROM bets WHERE match_id=? GROUP BY pick",
+        "SELECT pick, SUM(amount) sum FROM bets WHERE match_id=? GROUP BY pick",
         [matchId],
         (e, rows) => {
-          let totalA = 0;
-          let totalB = 0;
+          let a = 0, d = 0, b = 0;
 
           rows.forEach(r => {
-            if (r.pick === "a") totalA = r.sum;
-            if (r.pick === "b") totalB = r.sum;
+            if (r.pick === "a") a = r.sum;
+            if (r.pick === "d") d = r.sum;
+            if (r.pick === "b") b = r.sum;
           });
 
-          const odds = calculateOdds(totalA, totalB);
+          const o = calculateOdds(a, d, b);
 
           db.run(
-            "UPDATE matches SET oddsA=?, oddsB=? WHERE id=?",
-            [odds.oddsA, odds.oddsB, matchId]
+            "UPDATE matches SET oddsA=?, oddsD=?, oddsB=? WHERE id=?",
+            [o.oddsA, o.oddsD, o.oddsB, matchId]
           );
 
           res.json({ ok: true });
@@ -163,13 +162,12 @@ function admin(req, res, next) {
   next();
 }
 
-// DODAWANIE MECZU
 app.post("/api/admin/match", admin, (req, res) => {
   const { a, b } = req.body;
 
   db.run(
-    "INSERT INTO matches (a,b,oddsA,oddsB,status) VALUES (?,?,?,?, 'open')",
-    [a, b, 2.0, 2.0],
+    "INSERT INTO matches (a,b,oddsA,oddsD,oddsB,status) VALUES (?,?,?,?,?, 'open')",
+    [a, b, 2.5, 2.5, 2.5],
     () => res.json({ ok: true })
   );
 });
