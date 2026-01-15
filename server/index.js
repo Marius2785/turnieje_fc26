@@ -1,8 +1,8 @@
 import express from "express";
 import session from "express-session";
-import { db } from "./db.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import { db } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -18,8 +18,7 @@ app.use(session({
 
 app.use(express.static(path.join(__dirname, "../public")));
 
-/* ===== AUTH ===== */
-
+/* AUTH */
 app.post("/api/register", (req, res) => {
   const { login, password } = req.body;
   if (!login || !password) return res.json({ error: "Brak danych" });
@@ -36,20 +35,15 @@ app.post("/api/register", (req, res) => {
 
 app.post("/api/login", (req, res) => {
   const { login, password } = req.body;
-
   db.get(
     "SELECT * FROM users WHERE login=? AND password=?",
     [login, password],
-    (err, user) => {
+    (e, user) => {
       if (!user) return res.json({ error: "Złe dane" });
       req.session.user = user;
       res.json({ ok: true });
     }
   );
-});
-
-app.post("/api/logout", (req, res) => {
-  req.session.destroy(() => res.json({ ok: true }));
 });
 
 app.get("/api/me", (req, res) => {
@@ -62,8 +56,11 @@ app.get("/api/me", (req, res) => {
   });
 });
 
-/* ===== MATCHES ===== */
+app.post("/api/logout", (req, res) => {
+  req.session.destroy(() => res.json({ ok: true }));
+});
 
+/* MATCHES */
 app.get("/api/matches", (req, res) => {
   db.all("SELECT * FROM matches WHERE status='open'", (e, rows) => {
     res.json(rows);
@@ -88,19 +85,11 @@ app.post("/api/bet", (req, res) => {
     [amount, req.session.user.id]
   );
 
-  // dynamiczne kursy
-  const field = pick === "a" ? "oddsA" : pick === "b" ? "oddsB" : "oddsD";
-  db.run(
-    `UPDATE matches SET ${field}=${field}-0.1 WHERE id=?`,
-    [matchId]
-  );
-
   req.session.user.balance -= amount;
   res.json({ ok: true });
 });
 
-/* ===== ADMIN ===== */
-
+/* ADMIN */
 function admin(req, res, next) {
   if (!req.session.user || req.session.user.role !== "admin")
     return res.json({ error: "Brak dostępu" });
@@ -110,7 +99,7 @@ function admin(req, res, next) {
 app.post("/api/admin/match", admin, (req, res) => {
   const { a, b, oddsA, oddsD, oddsB } = req.body;
   db.run(
-    "INSERT INTO matches (a,b,oddsA,oddsD,oddsB,status) VALUES (?,?,?,?,?,'open')",
+    "INSERT INTO matches (a,b,oddsA,oddsD,oddsB) VALUES (?,?,?,?,?)",
     [a, b, oddsA, oddsD, oddsB],
     () => res.json({ ok: true })
   );
@@ -125,10 +114,12 @@ app.post("/api/admin/finish", admin, (req, res) => {
         if (b.pick === result) {
           const odd =
             result === "a" ? m.oddsA :
-            result === "b" ? m.oddsB :
-            m.oddsD;
+            result === "b" ? m.oddsB : m.oddsD;
           const payout = Math.floor(b.amount * odd);
-          db.run("UPDATE users SET balance=balance+? WHERE id=?", [payout, b.user_id]);
+          db.run(
+            "UPDATE users SET balance=balance+? WHERE id=?",
+            [payout, b.user_id]
+          );
         }
       });
 
