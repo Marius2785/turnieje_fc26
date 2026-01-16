@@ -28,7 +28,7 @@ h1 {
   margin-bottom: 20px;
 }
 
-input, button, select {
+input, button {
   width: 100%;
   padding: 10px;
   margin: 6px 0;
@@ -69,20 +69,9 @@ button.yellow { background:#f1c40f; color:#000 }
   margin-right: 6px;
 }
 
-.adminBox {
-  display: grid;
-  grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
-  gap: 10px;
-}
-
-.userRow {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  background:rgba(0,0,0,0.25);
-  padding:8px;
-  border-radius:6px;
-  font-size:13px;
+.adminBtns button {
+  width: auto;
+  margin-left: 4px;
 }
 
 footer {
@@ -196,80 +185,57 @@ async function load(){
           <button onclick="bet(${m.id},'b')">${m.b} (${m.oddsB})</button>
         </div>
         ${me.admin ? `
-        <div>
+        <div class="adminBtns">
           <button class="green" onclick="finish(${m.id},'a')">1</button>
           <button class="yellow" onclick="finish(${m.id},'d')">X</button>
           <button class="red" onclick="finish(${m.id},'b')">2</button>
+          <button class="red" onclick="cancel(${m.id})">Anuluj</button>
         </div>
         ` : ""}
       </div>
     `).join("");
 
   if(me.admin){
-    renderAdmin();
+    admin.innerHTML = `
+      <div class="card">
+        <h3>Panel admina</h3>
+        <input id="a" placeholder="Gracz A">
+        <input id="b" placeholder="Gracz B">
+        <button onclick="addMatch()">Dodaj mecz</button>
+      </div>
+    `;
   }
 }
 
 async function bet(id,pick){
   const amount = prompt("Kwota");
   if(!amount) return;
-  await api("/api/bet",{matchId:id,pick,amount:+amount});
+  const r = await api("/api/bet",{matchId:id,pick,amount:+amount});
+  if(r.error) alert(r.error);
+  else alert("Zakład przyjęty");
   load();
 }
 
-/* ================= ADMIN ================= */
-
-async function renderAdmin(){
-  const users = await fetch("/api/admin/users").then(r=>r.json());
-
-  admin.innerHTML = `
-    <div class="card">
-      <h3>Dodaj mecz</h3>
-      <input id="a" placeholder="Gracz A">
-      <input id="b" placeholder="Gracz B">
-      <button onclick="addMatch()">Dodaj mecz</button>
-    </div>
-
-    <div class="card">
-      <h3>Zarządzanie graczami</h3>
-      <div class="adminBox">
-        ${users.map(u=>`
-          <div class="userRow">
-            <div>
-              <b>${u.login}</b><br>
-              Saldo: ${u.balance}
-            </div>
-            <div>
-              <button class="green" onclick="setBalance(${u.id})">💰</button>
-              <button class="red" onclick="deleteUser(${u.id})">🗑</button>
-            </div>
-          </div>
-        `).join("")}
-      </div>
-    </div>
-  `;
-}
-
 async function addMatch(){
-  await api("/api/admin/match",{ a:a.value, b:b.value });
+  const r = await api("/api/admin/match",{ a:a.value, b:b.value });
+  if(r.error) alert(r.error);
+  else alert("Mecz dodany");
   load();
 }
 
 async function finish(id,res){
-  await api("/api/admin/finish",{ id, result:res });
+  if(!confirm("Na pewno zakończyć mecz?")) return;
+  const r = await api("/api/admin/finish",{ id, result:res });
+  if(r.error) alert(r.error);
+  else alert("Mecz rozliczony");
   load();
 }
 
-async function setBalance(id){
-  const balance = prompt("Nowe saldo:");
-  if(balance===null) return;
-  await api("/api/admin/balance",{ id, balance:+balance });
-  load();
-}
-
-async function deleteUser(id){
-  if(!confirm("Usunąć konto?")) return;
-  await api("/api/admin/deleteUser",{ id });
+async function cancel(id){
+  if(!confirm("Na pewno anulować mecz?")) return;
+  const r = await api("/api/admin/cancel",{ id });
+  if(r.error) alert(r.error);
+  else alert("Mecz anulowany");
   load();
 }
 
