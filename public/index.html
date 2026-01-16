@@ -28,7 +28,7 @@ h1 {
   margin-bottom: 20px;
 }
 
-input, button, select {
+input, button {
   width: 100%;
   padding: 10px;
   margin: 6px 0;
@@ -52,6 +52,7 @@ button {
 button.green { background:#28c76f }
 button.red { background:#ea5455 }
 button.gray { background:#777 }
+button.yellow { background:#ffb703; color:#000 }
 
 .match {
   display: flex;
@@ -177,6 +178,13 @@ async function load(){
           <button onclick="bet(${m.id},'a')">${m.a} (${m.oddsA})</button>
           <button onclick="bet(${m.id},'d')">Remis (${m.oddsD})</button>
           <button onclick="bet(${m.id},'b')">${m.b} (${m.oddsB})</button>
+          ${me.admin ? `
+            <br>
+            <button class="green" onclick="finish(${m.id},'a')">1</button>
+            <button class="yellow" onclick="finish(${m.id},'d')">X</button>
+            <button class="red" onclick="finish(${m.id},'b')">2</button>
+            <button class="gray" onclick="cancelMatch(${m.id})">Anuluj</button>
+          ` : ""}
         </div>
       </div>
     `).join("");
@@ -187,9 +195,6 @@ async function load(){
         <h3>Panel admina</h3>
         <input id="a" placeholder="Gracz A">
         <input id="b" placeholder="Gracz B">
-        <input id="oa" placeholder="Kurs A">
-        <input id="od" placeholder="Kurs Remis">
-        <input id="ob" placeholder="Kurs B">
         <button onclick="addMatch()">Dodaj mecz</button>
       </div>
     `;
@@ -198,6 +203,7 @@ async function load(){
 
 async function bet(id,pick){
   const amount = prompt("Kwota");
+  if(!amount) return;
   await api("/api/bet",{matchId:id,pick,amount:+amount});
   load();
 }
@@ -205,11 +211,20 @@ async function bet(id,pick){
 async function addMatch(){
   await api("/api/admin/match",{
     a:a.value,
-    b:b.value,
-    oddsA:+oa.value,
-    oddsD:+od.value,
-    oddsB:+ob.value
+    b:b.value
   });
+  load();
+}
+
+async function finish(id,result){
+  if(!confirm("Na pewno zakończyć mecz?")) return;
+  await api("/api/admin/finish",{id,result});
+  load();
+}
+
+async function cancelMatch(id){
+  if(!confirm("Na pewno anulować mecz?")) return;
+  await api("/api/admin/cancel",{id});
   load();
 }
 
