@@ -172,6 +172,61 @@ app.post("/api/admin/match", admin, (req, res) => {
   );
 });
 
+/* ======= NOWE: ZAKOŃCZENIE MECZU ======= */
+
+app.post("/api/admin/finish", admin, (req, res) => {
+  const { id, result } = req.body;
+
+  db.get("SELECT * FROM matches WHERE id=?", [id], (err, match) => {
+    if (!match) return res.json({ error: "Brak meczu" });
+
+    const odds =
+      result === "a" ? match.oddsA :
+      result === "d" ? match.oddsD :
+      match.oddsB;
+
+    db.all(
+      "SELECT * FROM bets WHERE match_id=? AND pick=?",
+      [id, result],
+      (e, bets) => {
+        bets.forEach(b => {
+          const win = b.amount * odds;
+          db.run(
+            "UPDATE users SET balance=balance+? WHERE id=?",
+            [win, b.user_id]
+          );
+        });
+
+        // usuń zakłady i mecz
+        db.run("DELETE FROM bets WHERE match_id=?", [id]);
+        db.run("DELETE FROM matches WHERE id=?", [id]);
+
+        res.json({ ok: true });
+      }
+    );
+  });
+});
+
+/* ======= NOWE: ANULOWANIE MECZU ======= */
+
+app.post("/api/admin/cancel", admin, (req, res) => {
+  const { id } = req.body;
+
+  db.all("SELECT * FROM bets WHERE match_id=?", [id], (e, bets) => {
+    bets.forEach(b => {
+      db.run(
+        "UPDATE users SET balance=balance+? WHERE id=?",
+        [b.amount, b.user_id]
+      );
+    });
+
+    db.run("DELETE FROM bets WHERE match_id=?", [id]);
+    db.run("DELETE FROM matches WHERE id=?", [id]);
+
+    res.json({ ok: true });
+  });
+});
+
 /* ================= START ================= */
 
 app.listen(process.env.PORT || 3000, () =>
