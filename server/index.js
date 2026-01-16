@@ -172,7 +172,7 @@ app.post("/api/admin/match", admin, (req, res) => {
   );
 });
 
-/* ======= NOWE: ZAKOŃCZENIE MECZU ======= */
+/* ======= ZAKOŃCZENIE MECZU ======= */
 
 app.post("/api/admin/finish", admin, (req, res) => {
   const { id, result } = req.body;
@@ -197,7 +197,6 @@ app.post("/api/admin/finish", admin, (req, res) => {
           );
         });
 
-        // usuń zakłady i mecz
         db.run("DELETE FROM bets WHERE match_id=?", [id]);
         db.run("DELETE FROM matches WHERE id=?", [id]);
 
@@ -207,7 +206,7 @@ app.post("/api/admin/finish", admin, (req, res) => {
   });
 });
 
-/* ======= NOWE: ANULOWANIE MECZU ======= */
+/* ======= ANULOWANIE MECZU ======= */
 
 app.post("/api/admin/cancel", admin, (req, res) => {
   const { id } = req.body;
@@ -225,6 +224,39 @@ app.post("/api/admin/cancel", admin, (req, res) => {
 
     res.json({ ok: true });
   });
+});
+
+/* ======= NOWE: ADMIN — UŻYTKOWNICY ======= */
+
+// lista użytkowników
+app.get("/api/admin/users", admin, (req, res) => {
+  db.all(
+    "SELECT id, login, balance, role FROM users ORDER BY login",
+    (e, rows) => res.json(rows)
+  );
+});
+
+// zmiana salda
+app.post("/api/admin/balance", admin, (req, res) => {
+  const { userId, balance } = req.body;
+  const b = Number(balance);
+  if (isNaN(b)) return res.json({ error: "Zła kwota" });
+
+  db.run(
+    "UPDATE users SET balance=? WHERE id=?",
+    [b, userId],
+    () => res.json({ ok: true })
+  );
+});
+
+// usuwanie konta
+app.post("/api/admin/deleteUser", admin, (req, res) => {
+  const { userId } = req.body;
+
+  db.run("DELETE FROM bets WHERE user_id=?", [userId]);
+  db.run("DELETE FROM users WHERE id=?", [userId], () =>
+    res.json({ ok: true })
+  );
 });
 
 /* ================= START ================= */
