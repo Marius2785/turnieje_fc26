@@ -75,6 +75,17 @@ button.yellow { background:#ffb703; color:#000 }
   margin-right: 4px;
 }
 
+.user-row {
+  display:flex;
+  gap:6px;
+  align-items:center;
+  margin-bottom:6px;
+}
+
+.user-row input {
+  width:90px;
+}
+
 footer {
   position: fixed;
   left: 10px;
@@ -205,7 +216,13 @@ async function load(){
         <input id="b" placeholder="Gracz B">
         <button onclick="addMatch()">Dodaj mecz</button>
       </div>
+
+      <div class="card">
+        <h3>Użytkownicy</h3>
+        <div id="users"></div>
+      </div>
     `;
+    loadUsers();
   }
 }
 
@@ -236,6 +253,35 @@ async function cancelMatch(id){
   if(!confirm("Na pewno anulować mecz?")) return;
   await api("/api/admin/cancel",{id});
   alert("Mecz anulowany — stawki zwrócone");
+  load();
+}
+
+/* ===== ADMIN — UŻYTKOWNICY ===== */
+
+async function loadUsers(){
+  const users = await fetch("/api/admin/users").then(r=>r.json());
+  document.getElementById("users").innerHTML =
+    users.map(u=>`
+      <div class="user-row">
+        <b>${u.login}</b>
+        <input type="number" value="${u.balance}" id="bal-${u.id}">
+        <button class="green" onclick="saveBalance(${u.id})">💾</button>
+        <button class="red" onclick="deleteUser(${u.id})">🗑</button>
+      </div>
+    `).join("");
+}
+
+async function saveBalance(id){
+  const v = document.getElementById("bal-"+id).value;
+  await api("/api/admin/balance",{userId:id,balance:+v});
+  alert("Saldo zapisane");
+  load();
+}
+
+async function deleteUser(id){
+  if(!confirm("Na pewno usunąć konto?")) return;
+  await api("/api/admin/deleteUser",{userId:id});
+  alert("Konto usunięte");
   load();
 }
 
