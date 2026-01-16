@@ -52,6 +52,7 @@ button {
 button.green { background:#28c76f }
 button.red { background:#ea5455 }
 button.gray { background:#777 }
+button.yellow { background:#f1c40f; color:#000 }
 
 .match {
   display: flex;
@@ -194,6 +195,13 @@ async function load(){
           <button onclick="bet(${m.id},'d')">Remis (${m.oddsD})</button>
           <button onclick="bet(${m.id},'b')">${m.b} (${m.oddsB})</button>
         </div>
+        ${me.admin ? `
+        <div>
+          <button class="green" onclick="finish(${m.id},'a')">1</button>
+          <button class="yellow" onclick="finish(${m.id},'d')">X</button>
+          <button class="red" onclick="finish(${m.id},'b')">2</button>
+        </div>
+        ` : ""}
       </div>
     `).join("");
 
@@ -216,21 +224,10 @@ async function renderAdmin(){
 
   admin.innerHTML = `
     <div class="card">
-      <h3>Panel admina — mecze</h3>
+      <h3>Dodaj mecz</h3>
       <input id="a" placeholder="Gracz A">
       <input id="b" placeholder="Gracz B">
       <button onclick="addMatch()">Dodaj mecz</button>
-
-      <hr>
-
-      <input id="mid" placeholder="ID meczu">
-      <select id="res">
-        <option value="a">Wygrywa A</option>
-        <option value="d">Remis</option>
-        <option value="b">Wygrywa B</option>
-      </select>
-      <button class="green" onclick="finish()">Zakończ mecz</button>
-      <button class="red" onclick="cancel()">Anuluj mecz</button>
     </div>
 
     <div class="card">
@@ -240,7 +237,6 @@ async function renderAdmin(){
           <div class="userRow">
             <div>
               <b>${u.login}</b><br>
-              Hasło: ${u.password}<br>
               Saldo: ${u.balance}
             </div>
             <div>
@@ -259,13 +255,8 @@ async function addMatch(){
   load();
 }
 
-async function finish(){
-  await api("/api/admin/finish",{ id:+mid.value, result:res.value });
-  load();
-}
-
-async function cancel(){
-  await api("/api/admin/cancel",{ id:+mid.value });
+async function finish(id,res){
+  await api("/api/admin/finish",{ id, result:res });
   load();
 }
 
