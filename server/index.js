@@ -78,7 +78,6 @@ app.get("/api/matches", (req, res) => {
 
 /* ================= ODDS ================= */
 
-// bufor 8% – stabilne kursy przy ~15 osobach
 function calculateOdds(a, d, b) {
   const buffer = 0.08;
   const total = a + d + b + 1;
@@ -127,7 +126,6 @@ app.post("/api/bet", (req, res) => {
 
       req.session.user.balance -= stake;
 
-      // przeliczanie kursów
       db.all(
         "SELECT pick, SUM(amount) sum FROM bets WHERE match_id=? GROUP BY pick",
         [matchId],
@@ -226,36 +224,32 @@ app.post("/api/admin/cancel", admin, (req, res) => {
   });
 });
 
-/* ======= NOWE: ADMIN — UŻYTKOWNICY ======= */
+/* ======= ZMIANA SALDA ======= */
 
-// lista użytkowników
-app.get("/api/admin/users", admin, (req, res) => {
-  db.all(
-    "SELECT id, login, balance, role FROM users ORDER BY login",
-    (e, rows) => res.json(rows)
-  );
-});
-
-// zmiana salda
 app.post("/api/admin/balance", admin, (req, res) => {
-  const { userId, balance } = req.body;
-  const b = Number(balance);
-  if (isNaN(b)) return res.json({ error: "Zła kwota" });
-
+  const { login, balance } = req.body;
   db.run(
-    "UPDATE users SET balance=? WHERE id=?",
-    [b, userId],
+    "UPDATE users SET balance=? WHERE login=?",
+    [balance, login],
     () => res.json({ ok: true })
   );
 });
 
-// usuwanie konta
-app.post("/api/admin/deleteUser", admin, (req, res) => {
-  const { userId } = req.body;
+/* ======= USUWANIE KONTA ======= */
 
-  db.run("DELETE FROM bets WHERE user_id=?", [userId]);
-  db.run("DELETE FROM users WHERE id=?", [userId], () =>
+app.post("/api/admin/deleteUser", admin, (req, res) => {
+  const { login } = req.body;
+  db.run("DELETE FROM users WHERE login=?", [login], () =>
     res.json({ ok: true })
+  );
+});
+
+/* ======= TOP 10 ======= */
+
+app.get("/api/top10", (req, res) => {
+  db.all(
+    "SELECT login, balance FROM users ORDER BY balance DESC LIMIT 10",
+    (err, rows) => res.json(rows)
   );
 });
 
