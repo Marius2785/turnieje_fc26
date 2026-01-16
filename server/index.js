@@ -78,7 +78,6 @@ app.get("/api/matches", (req, res) => {
 
 /* ================= ODDS ================= */
 
-// bufor 8% – stabilne kursy przy ~15 osobach
 function calculateOdds(a, d, b) {
   const buffer = 0.08;
   const total = a + d + b + 1;
@@ -116,8 +115,11 @@ app.post("/api/bet", (req, res) => {
         return res.json({ error: "Mecz nie istnieje" });
 
       db.run(
-        "INSERT INTO bets (user_id,match_id,pick,amount) VALUES (?,?,?,?)",
-        [req.session.user.id, matchId, pick, stake]
+        "INSERT INTO bets (user_id,match_id,pick,amount,odds) VALUES (?,?,?,?,?)",
+        [req.session.user.id, matchId, pick, stake,
+         pick === "a" ? match.oddsA :
+         pick === "d" ? match.oddsD :
+         match.oddsB]
       );
 
       db.run(
@@ -127,7 +129,6 @@ app.post("/api/bet", (req, res) => {
 
       req.session.user.balance -= stake;
 
-      // przeliczanie kursów
       db.all(
         "SELECT pick, SUM(amount) sum FROM bets WHERE match_id=? GROUP BY pick",
         [matchId],
@@ -172,35 +173,33 @@ app.post("/api/admin/match", admin, (req, res) => {
   );
 });
 
-/* ======= NOWE: ZAKOŃCZENIE MECZU ======= */
+/* ======== FINISH MATCH (1/X/2) ======== */
 
 app.post("/api/admin/finish", admin, (req, res) => {
   const { id, result } = req.body;
 
-  db.get("SELECT * FROM matches WHERE id=?", [id], (e, match) => {
-    if (!match) return res.json({ error: "Brak meczu" });
+  db.get("SELECT * FROM matches WHERE id=? AND status='open'", [id], (err, match) => {
+    if (!match) return res.json({ error: "Mecz nie istnieje" });
 
-    db.all("SELECT * FROM bets WHERE match_id=?", [id], (e, bets) => {
-      bets.forEach(b => {
-        if (b.pick === result) {
-          const odd =
-            result === "a" ? match.oddsA :
-            result === "b" ? match.oddsB :
-            match.oddsD;
-
-          const win = Math.floor(b.amount * odd);
+    db.all(
+      "SELECT * FROM bets WHERE match_id=? AND pick=?",
+      [id, result],
+      (e, bets) => {
+        bets.forEach(b => {
+          const win = b.amount * b.odds;
           db.run("UPDATE users SET balance=balance+? WHERE id=?", [win, b.user_id]);
-        }
-      });
+        });
 
-      db.run("DELETE FROM bets WHERE match_id=?", [id]);
-      db.run("DELETE FROM matches WHERE id=?", [id]);
-      res.json({ ok: true });
-    });
+        db.run("DELETE FROM bets WHERE match_id=?", [id]);
+        db.run("DELETE FROM matches WHERE id=?", [id], () => {
+          res.json({ ok: true });
+        });
+      }
+    );
   });
 });
 
-/* ======= NOWE: ANULOWANIE MECZU ======= */
+/* ======== CANCEL MATCH ======== */
 
 app.post("/api/admin/cancel", admin, (req, res) => {
   const { id } = req.body;
@@ -211,36 +210,32 @@ app.post("/api/admin/cancel", admin, (req, res) => {
     });
 
     db.run("DELETE FROM bets WHERE match_id=?", [id]);
-    db.run("DELETE FROM matches WHERE id=?", [id]);
-    res.json({ ok: true });
+    db.run("DELETE FROM matches WHERE id=?", [id], () => {
+      res.json({ ok: true });
+    });
   });
 });
 
-/* ======= NOWE: LISTA GRACZY ======= */
+/* ======== USERS ======== */
 
 app.get("/api/admin/users", admin, (req, res) => {
-  db.all("SELECT id,login,balance,role,password FROM users", (e, rows) => {
-    res.json(rows);
-  });
+  db.all("SELECT id,login,balance FROM users WHERE role!='admin'", (e, rows) =>
+    res.json(rows)
+  );
 });
-
-/* ======= NOWE: ZMIANA SALDA ======= */
 
 app.post("/api/admin/balance", admin, (req, res) => {
   const { id, balance } = req.body;
-  db.run("UPDATE users SET balance=? WHERE id=?", [balance, id], () => {
-    res.json({ ok: true });
-  });
+  db.run("UPDATE users SET balance=? WHERE id=?", [balance, id], () =>
+    res.json({ ok: true })
+  );
 });
-
-/* ======= NOWE: USUWANIE KONTA ======= */
 
 app.post("/api/admin/deleteUser", admin, (req, res) => {
   const { id } = req.body;
-  db.run("DELETE FROM users WHERE id=?", [id], () => {
-    db.run("DELETE FROM bets WHERE user_id=?", [id]);
-    res.json({ ok: true });
-  });
+  db.run("DELETE FROM users WHERE id=?", [id], () =>
+    res.json({ ok: true })
+  );
 });
 
 /* ================= START ================= */
