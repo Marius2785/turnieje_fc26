@@ -52,7 +52,7 @@ button {
 button.green { background:#28c76f }
 button.red { background:#ea5455 }
 button.gray { background:#777 }
-button.yellow { background:#f1c40f; color:#000 }
+button.yellow { background:#ffb703; color:#000 }
 
 .match {
   display: flex;
@@ -67,11 +67,6 @@ button.yellow { background:#f1c40f; color:#000 }
 .odds button {
   width: auto;
   margin-right: 6px;
-}
-
-.adminBtns button {
-  width: auto;
-  margin-left: 4px;
 }
 
 footer {
@@ -183,15 +178,14 @@ async function load(){
           <button onclick="bet(${m.id},'a')">${m.a} (${m.oddsA})</button>
           <button onclick="bet(${m.id},'d')">Remis (${m.oddsD})</button>
           <button onclick="bet(${m.id},'b')">${m.b} (${m.oddsB})</button>
+          ${me.admin ? `
+            <br>
+            <button class="green" onclick="finish(${m.id},'a')">1</button>
+            <button class="yellow" onclick="finish(${m.id},'d')">X</button>
+            <button class="red" onclick="finish(${m.id},'b')">2</button>
+            <button class="gray" onclick="cancelMatch(${m.id})">Anuluj</button>
+          ` : ""}
         </div>
-        ${me.admin ? `
-        <div class="adminBtns">
-          <button class="green" onclick="finish(${m.id},'a')">1</button>
-          <button class="yellow" onclick="finish(${m.id},'d')">X</button>
-          <button class="red" onclick="finish(${m.id},'b')">2</button>
-          <button class="red" onclick="cancel(${m.id})">Anuluj</button>
-        </div>
-        ` : ""}
       </div>
     `).join("");
 
@@ -210,32 +204,27 @@ async function load(){
 async function bet(id,pick){
   const amount = prompt("Kwota");
   if(!amount) return;
-  const r = await api("/api/bet",{matchId:id,pick,amount:+amount});
-  if(r.error) alert(r.error);
-  else alert("Zakład przyjęty");
+  await api("/api/bet",{matchId:id,pick,amount:+amount});
   load();
 }
 
 async function addMatch(){
-  const r = await api("/api/admin/match",{ a:a.value, b:b.value });
-  if(r.error) alert(r.error);
-  else alert("Mecz dodany");
+  await api("/api/admin/match",{
+    a:a.value,
+    b:b.value
+  });
   load();
 }
 
-async function finish(id,res){
+async function finish(id,result){
   if(!confirm("Na pewno zakończyć mecz?")) return;
-  const r = await api("/api/admin/finish",{ id, result:res });
-  if(r.error) alert(r.error);
-  else alert("Mecz rozliczony");
+  await api("/api/admin/finish",{id,result});
   load();
 }
 
-async function cancel(id){
+async function cancelMatch(id){
   if(!confirm("Na pewno anulować mecz?")) return;
-  const r = await api("/api/admin/cancel",{ id });
-  if(r.error) alert(r.error);
-  else alert("Mecz anulowany");
+  await api("/api/admin/cancel",{id});
   load();
 }
 
