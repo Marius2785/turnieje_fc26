@@ -8,7 +8,7 @@ body {
   margin: 0;
   font-family: Arial, sans-serif;
   background: radial-gradient(circle at top, #0f2a3a, #08151f);
-  color: #ff9808;
+  color: #fff;
 }
 
 h1 {
@@ -69,8 +69,21 @@ button.yellow { background:#ffb703; color:#000 }
   margin-right: 6px;
 }
 
-.top10 li {
-  margin: 4px 0;
+.admin-actions button {
+  width: 40px;
+  margin-top: 6px;
+  margin-right: 4px;
+}
+
+.user-row {
+  display:flex;
+  gap:6px;
+  align-items:center;
+  margin-bottom:6px;
+}
+
+.user-row input {
+  width:90px;
 }
 
 footer {
@@ -113,12 +126,6 @@ footer {
     </div>
 
     <div id="matches"></div>
-
-    <!-- TOP 10 -->
-    <div id="top10" class="card">
-      <h3>🏆 TOP 10 Najbogatszych</h3>
-      <ol id="top10list" class="top10"></ol>
-    </div>
 
     <div id="admin"></div>
 
@@ -188,21 +195,18 @@ async function load(){
           <button onclick="bet(${m.id},'a')">${m.a} (${m.oddsA})</button>
           <button onclick="bet(${m.id},'d')">Remis (${m.oddsD})</button>
           <button onclick="bet(${m.id},'b')">${m.b} (${m.oddsB})</button>
+
           ${me.admin ? `
-            <br>
-            <button class="green" onclick="finish(${m.id},'a')">1</button>
-            <button class="yellow" onclick="finish(${m.id},'d')">X</button>
-            <button class="red" onclick="finish(${m.id},'b')">2</button>
-            <button class="gray" onclick="cancelMatch(${m.id})">Anuluj</button>
+            <div class="admin-actions">
+              <button class="green" onclick="finish(${m.id},'a')">1</button>
+              <button class="yellow" onclick="finish(${m.id},'d')">X</button>
+              <button class="red" onclick="finish(${m.id},'b')">2</button>
+              <button class="gray" onclick="cancelMatch(${m.id})">⛔</button>
+            </div>
           ` : ""}
         </div>
       </div>
     `).join("");
-
-  // TOP 10
-  const top = await fetch("/api/top10").then(r=>r.json());
-  document.getElementById("top10list").innerHTML =
-    top.map((u,i)=>`<li>${i+1}. ${u.login} — ${u.balance} 💰</li>`).join("");
 
   if(me.admin){
     admin.innerHTML = `
@@ -211,26 +215,22 @@ async function load(){
         <input id="a" placeholder="Gracz A">
         <input id="b" placeholder="Gracz B">
         <button onclick="addMatch()">Dodaj mecz</button>
+      </div>
 
-        <hr>
-
-        <h4>Zarządzanie saldem</h4>
-        <input id="ulogin" placeholder="Login gracza">
-        <input id="ubalance" type="number" placeholder="Nowe saldo">
-        <button onclick="setBalance()">Zmień saldo</button>
-
-        <h4>Usuń konto</h4>
-        <input id="dlogin" placeholder="Login gracza">
-        <button class="red" onclick="deleteUser()">Usuń konto</button>
+      <div class="card">
+        <h3>Użytkownicy</h3>
+        <div id="users"></div>
       </div>
     `;
+    loadUsers();
   }
 }
 
 async function bet(id,pick){
   const amount = prompt("Kwota");
   if(!amount) return;
-  await api("/api/bet",{matchId:id,pick,amount:+amount});
+  const r = await api("/api/bet",{matchId:id,pick,amount:+amount});
+  if(r.error) alert(r.error);
   load();
 }
 
@@ -245,26 +245,43 @@ async function addMatch(){
 async function finish(id,result){
   if(!confirm("Na pewno zakończyć mecz?")) return;
   await api("/api/admin/finish",{id,result});
+  alert("Mecz zakończony — wypłaty rozdane");
   load();
 }
 
 async function cancelMatch(id){
   if(!confirm("Na pewno anulować mecz?")) return;
   await api("/api/admin/cancel",{id});
+  alert("Mecz anulowany — stawki zwrócone");
   load();
 }
 
-async function setBalance(){
-  await api("/api/admin/balance",{
-    login:ulogin.value,
-    balance:+ubalance.value
-  });
+/* ===== ADMIN — UŻYTKOWNICY ===== */
+
+async function loadUsers(){
+  const users = await fetch("/api/admin/users").then(r=>r.json());
+  document.getElementById("users").innerHTML =
+    users.map(u=>`
+      <div class="user-row">
+        <b>${u.login}</b>
+        <input type="number" value="${u.balance}" id="bal-${u.id}">
+        <button class="green" onclick="saveBalance(${u.id})">💾</button>
+        <button class="red" onclick="deleteUser(${u.id})">🗑</button>
+      </div>
+    `).join("");
+}
+
+async function saveBalance(id){
+  const v = document.getElementById("bal-"+id).value;
+  await api("/api/admin/balance",{userId:id,balance:+v});
+  alert("Saldo zapisane");
   load();
 }
 
-async function deleteUser(){
+async function deleteUser(id){
   if(!confirm("Na pewno usunąć konto?")) return;
-  await api("/api/admin/deleteUser",{login:dlogin.value});
+  await api("/api/admin/deleteUser",{userId:id});
+  alert("Konto usunięte");
   load();
 }
 
