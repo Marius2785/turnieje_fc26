@@ -177,33 +177,26 @@ app.post("/api/admin/match", admin, (req, res) => {
 app.post("/api/admin/finish", admin, (req, res) => {
   const { id, result } = req.body;
 
-  db.get("SELECT * FROM matches WHERE id=?", [id], (err, match) => {
+  db.get("SELECT * FROM matches WHERE id=?", [id], (e, match) => {
     if (!match) return res.json({ error: "Brak meczu" });
 
-    const odds =
-      result === "a" ? match.oddsA :
-      result === "d" ? match.oddsD :
-      match.oddsB;
+    db.all("SELECT * FROM bets WHERE match_id=?", [id], (e, bets) => {
+      bets.forEach(b => {
+        if (b.pick === result) {
+          const odd =
+            result === "a" ? match.oddsA :
+            result === "b" ? match.oddsB :
+            match.oddsD;
 
-    db.all(
-      "SELECT * FROM bets WHERE match_id=? AND pick=?",
-      [id, result],
-      (e, bets) => {
-        bets.forEach(b => {
-          const win = b.amount * odds;
-          db.run(
-            "UPDATE users SET balance=balance+? WHERE id=?",
-            [win, b.user_id]
-          );
-        });
+          const win = Math.floor(b.amount * odd);
+          db.run("UPDATE users SET balance=balance+? WHERE id=?", [win, b.user_id]);
+        }
+      });
 
-        // usuń zakłady i mecz
-        db.run("DELETE FROM bets WHERE match_id=?", [id]);
-        db.run("DELETE FROM matches WHERE id=?", [id]);
-
-        res.json({ ok: true });
-      }
-    );
+      db.run("DELETE FROM bets WHERE match_id=?", [id]);
+      db.run("DELETE FROM matches WHERE id=?", [id]);
+      res.json({ ok: true });
+    });
   });
 });
 
@@ -214,15 +207,38 @@ app.post("/api/admin/cancel", admin, (req, res) => {
 
   db.all("SELECT * FROM bets WHERE match_id=?", [id], (e, bets) => {
     bets.forEach(b => {
-      db.run(
-        "UPDATE users SET balance=balance+? WHERE id=?",
-        [b.amount, b.user_id]
-      );
+      db.run("UPDATE users SET balance=balance+? WHERE id=?", [b.amount, b.user_id]);
     });
 
     db.run("DELETE FROM bets WHERE match_id=?", [id]);
     db.run("DELETE FROM matches WHERE id=?", [id]);
+    res.json({ ok: true });
+  });
+});
 
+/* ======= NOWE: LISTA GRACZY ======= */
+
+app.get("/api/admin/users", admin, (req, res) => {
+  db.all("SELECT id,login,balance,role,password FROM users", (e, rows) => {
+    res.json(rows);
+  });
+});
+
+/* ======= NOWE: ZMIANA SALDA ======= */
+
+app.post("/api/admin/balance", admin, (req, res) => {
+  const { id, balance } = req.body;
+  db.run("UPDATE users SET balance=? WHERE id=?", [balance, id], () => {
+    res.json({ ok: true });
+  });
+});
+
+/* ======= NOWE: USUWANIE KONTA ======= */
+
+app.post("/api/admin/deleteUser", admin, (req, res) => {
+  const { id } = req.body;
+  db.run("DELETE FROM users WHERE id=?", [id], () => {
+    db.run("DELETE FROM bets WHERE user_id=?", [id]);
     res.json({ ok: true });
   });
 });
