@@ -1,6 +1,11 @@
 import sqlite3 from "sqlite3";
+import fs from "fs";
+import path from "path";
 
-export const db = new sqlite3.Database("db.sqlite");
+const DB_DIR = "/var/data";
+if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
+
+export const db = new sqlite3.Database(path.join(DB_DIR, "db.sqlite"));
 
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -29,7 +34,6 @@ db.serialize(() => {
     amount INTEGER
   )`);
 
-  // ADMIN – tworzy się tylko raz
   db.run(
     `INSERT OR IGNORE INTO users (login,password,role,balance)
      VALUES ('administrator','małpyigoryle23_','admin',999999)`
