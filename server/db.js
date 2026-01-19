@@ -5,7 +5,7 @@ export const db = createClient({
   authToken: process.env.DATABASE_TOKEN
 });
 
-// inicjalizacja tabel
+// init tables
 await db.execute(`
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -13,8 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
   password TEXT,
   balance INTEGER DEFAULT 1000,
   role TEXT DEFAULT 'user'
-);
-`);
+)`);
 
 await db.execute(`
 CREATE TABLE IF NOT EXISTS matches (
@@ -25,8 +24,7 @@ CREATE TABLE IF NOT EXISTS matches (
   oddsD REAL,
   oddsB REAL,
   status TEXT DEFAULT 'open'
-);
-`);
+)`);
 
 await db.execute(`
 CREATE TABLE IF NOT EXISTS bets (
@@ -35,10 +33,10 @@ CREATE TABLE IF NOT EXISTS bets (
   match_id INTEGER,
   pick TEXT,
   amount INTEGER
-);
-`);
+)`);
 
+// admin only once
 await db.execute(`
 INSERT OR IGNORE INTO users (login,password,role,balance)
-VALUES ('administrator','małpyigoryle23_','admin',999999);
+VALUES ('administrator','małpyigoryle23_','admin',999999)
 `);
