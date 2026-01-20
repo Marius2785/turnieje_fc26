@@ -1,13 +1,9 @@
-import { createClient } from "@libsql/client";
+import sqlite3 from "sqlite3";
 
-export const db = createClient({
-  url: process.env.DATABASE_URL,
-  authToken: process.env.DATABASE_TOKEN
-});
+export const db = new sqlite3.Database("db.sqlite");
 
-async function init() {
-  await db.execute(`
-  CREATE TABLE IF NOT EXISTS users (
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     login TEXT UNIQUE,
     password TEXT,
@@ -15,8 +11,7 @@ async function init() {
     role TEXT DEFAULT 'user'
   )`);
 
-  await db.execute(`
-  CREATE TABLE IF NOT EXISTS matches (
+  db.run(`CREATE TABLE IF NOT EXISTS matches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     a TEXT,
     b TEXT,
@@ -26,8 +21,7 @@ async function init() {
     status TEXT DEFAULT 'open'
   )`);
 
-  await db.execute(`
-  CREATE TABLE IF NOT EXISTS bets (
+  db.run(`CREATE TABLE IF NOT EXISTS bets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
     match_id INTEGER,
@@ -35,11 +29,8 @@ async function init() {
     amount INTEGER
   )`);
 
-  // ADMIN – tworzy się tylko raz
-  await db.execute(`
-  INSERT OR IGNORE INTO users (login,password,role,balance)
-  VALUES ('administrator','małpyigoryle23_','admin',999999)
+  db.run(`
+    INSERT OR IGNORE INTO users (login,password,role,balance)
+    VALUES ('administrator','małpyigoryle23_','admin',999999)
   `);
-}
-
-init();
+});
