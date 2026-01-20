@@ -9,7 +9,6 @@
   "dependencies": {
     "express": "^4.19.2",
     "express-session": "^1.17.3",
-    "sqlite3": "^5.1.7",
-    "@libsql/client": "^0.6.2"
+    "sqlite3": "^5.1.7"
   }
 }
