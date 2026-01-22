@@ -20,15 +20,6 @@ app.use(session({
 
 app.use(express.static(path.join(__dirname, "../public")));
 
-/* ================= HELPERS ================= */
-
-async function bettingOpen() {
-  const { rows } = await pool.query(
-    "SELECT value FROM settings WHERE key='betting_open'"
-  );
-  return rows[0]?.value === "true";
-}
-
 /* ================= AUTH ================= */
 
 app.post("/api/register", async (req, res) => {
@@ -66,7 +57,7 @@ app.post("/api/logout", (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
 
-app.get("/api/me", async (req, res) => {
+app.get("/api/me", (req, res) => {
   if (!req.session.user)
     return res.json({ logged: false });
 
@@ -75,14 +66,6 @@ app.get("/api/me", async (req, res) => {
     login: req.session.user.login,
     balance: req.session.user.balance,
     admin: req.session.user.role === "admin"
-  });
-});
-
-/* ================= STATUS ================= */
-
-app.get("/api/status", async (req, res) => {
-  res.json({
-    bettingOpen: await bettingOpen()
   });
 });
 
@@ -116,9 +99,6 @@ function calculateOdds(a, d, b) {
 app.post("/api/bet", async (req, res) => {
   if (!req.session.user)
     return res.json({ error: "Brak loginu" });
-
-  if (!(await bettingOpen()))
-    return res.json({ error: "Obstawianie jest obecnie zablokowane" });
 
   const { matchId, pick, amount } = req.body;
   const stake = Number(amount);
@@ -177,19 +157,6 @@ function admin(req, res, next) {
     return res.json({ error: "Brak dostępu" });
   next();
 }
-
-/* ===== GLOBAL BLOKADA OBSTAWIANIA ===== */
-
-app.post("/api/admin/toggle-betting", admin, async (req, res) => {
-  const open = req.body.open === true;
-
-  await pool.query(
-    "UPDATE settings SET value=$1 WHERE key='betting_open'",
-    [open ? "true" : "false"]
-  );
-
-  res.json({ ok: true, bettingOpen: open });
-});
 
 app.post("/api/admin/match", admin, async (req, res) => {
   const { a, b } = req.body;
@@ -256,6 +223,22 @@ app.post("/api/admin/cancel", admin, async (req, res) => {
   await pool.query("DELETE FROM matches WHERE id=$1", [id]);
 
   res.json({ ok: true });
+});
+
+/* ======= 🆕 ADMIN — BETY NA MECZ ======= */
+
+app.get("/api/admin/matchBets/:id", admin, async (req, res) => {
+  const { id } = req.params;
+
+  const { rows } = await pool.query(`
+    SELECT u.login, b.pick, b.amount
+    FROM bets b
+    JOIN users u ON u.id = b.user_id
+    WHERE b.match_id = $1
+    ORDER BY u.login
+  `, [id]);
+
+  res.json(rows);
 });
 
 /* ======= ADMIN — UŻYTKOWNICY ======= */
