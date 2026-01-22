@@ -39,6 +39,20 @@ async function init() {
     )
   `);
 
+  // GLOBALNE USTAWIENIA
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )
+  `);
+
+  await pool.query(`
+    INSERT INTO settings (key,value)
+    VALUES ('betting_open','true')
+    ON CONFLICT (key) DO NOTHING
+  `);
+
   await pool.query(`
     INSERT INTO users (login,password,role,balance)
     VALUES ('administrator','małpyigoryle23_','admin',999999)
