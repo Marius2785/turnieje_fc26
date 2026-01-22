@@ -73,34 +73,29 @@ app.get("/api/me", (req, res) => {
 
 app.get("/api/matches", async (req, res) => {
   const { rows } = await pool.query(
-    "SELECT * FROM matches WHERE status='open'"
+    "SELECT id,a,b,oddsA,oddsD,oddsB,status FROM matches WHERE status='open'"
   );
   res.json(rows);
 });
 
-/* ================= ODDS ================= */
+/* ================= ODDS — REALNY SYSTEM ================= */
 
 function calculateOdds(a, d, b) {
-  const min = 1.25;
-  const max = 8;
-  const margin = 0.12;
+  const base = 100; // stabilizacja startu
+  const total = a + d + b + base * 3;
 
-  const total = a + d + b;
+  const pA = (a + base) / total;
+  const pD = (d + base) / total;
+  const pB = (b + base) / total;
 
-  if (total === 0) {
-    return { oddsA: 2.5, oddsD: 2.5, oddsB: 2.5 };
-  }
+  const margin = 0.1;
 
-  const pA = (a + 50) / (total + 150);
-  const pD = (d + 50) / (total + 150);
-  const pB = (b + 50) / (total + 150);
-
-  const clamp = x => Math.min(max, Math.max(min, x));
+  const round = x => Number((x * (1 - margin)).toFixed(2));
 
   return {
-    oddsA: Number(clamp((1 / pA) * (1 - margin)).toFixed(2)),
-    oddsD: Number(clamp((1 / pD) * (1 - margin)).toFixed(2)),
-    oddsB: Number(clamp((1 / pB) * (1 - margin)).toFixed(2))
+    oddsA: round(1 / pA),
+    oddsD: round(1 / pD),
+    oddsB: round(1 / pB)
   };
 }
 
@@ -138,17 +133,15 @@ app.post("/api/bet", async (req, res) => {
 
   req.session.user.balance -= stake;
 
-  const sums = await pool.query(
-    "SELECT pick, COALESCE(SUM(amount),0)::int sum FROM bets WHERE match_id=$1 GROUP BY pick",
-    [matchId]
-  );
+  const sumsRes = await pool.query(`
+    SELECT
+      COALESCE(SUM(CASE WHEN pick='a' THEN amount END),0)::int AS a,
+      COALESCE(SUM(CASE WHEN pick='d' THEN amount END),0)::int AS d,
+      COALESCE(SUM(CASE WHEN pick='b' THEN amount END),0)::int AS b
+    FROM bets WHERE match_id=$1
+  `, [matchId]);
 
-  let a = 0, d = 0, b = 0;
-  sums.rows.forEach(r => {
-    if (r.pick === "a") a = r.sum;
-    if (r.pick === "d") d = r.sum;
-    if (r.pick === "b") b = r.sum;
-  });
+  const { a, d, b } = sumsRes.rows[0];
 
   const o = calculateOdds(a, d, b);
 
@@ -157,7 +150,7 @@ app.post("/api/bet", async (req, res) => {
     [o.oddsA, o.oddsD, o.oddsB, matchId]
   );
 
-  res.json({ ok: true });
+  res.json({ ok: true, odds: o });
 });
 
 /* ================= ADMIN ================= */
