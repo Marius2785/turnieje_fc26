@@ -60,7 +60,7 @@ async function init() {
 
   await pool.query(`
     INSERT INTO users (login,password,role,balance,approved)
-    VALUES ('administrator','małpyigoryle23_','admin',999999,true)
+    VALUES ('administrator','małpyigoryle233_','admin',999999,true)
     ON CONFLICT (login) DO NOTHING
   `);
 }
