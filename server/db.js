@@ -13,7 +13,8 @@ async function init() {
       login TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       balance INTEGER DEFAULT 1000,
-      role TEXT DEFAULT 'user'
+      role TEXT DEFAULT 'user',
+      approved BOOLEAN DEFAULT false
     )
   `);
 
@@ -39,7 +40,6 @@ async function init() {
     )
   `);
 
-  // GLOBALNE USTAWIENIA
   await pool.query(`
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
@@ -54,8 +54,8 @@ async function init() {
   `);
 
   await pool.query(`
-    INSERT INTO users (login,password,role,balance)
-    VALUES ('administrator','małpyigoryle23_','admin',999999)
+    INSERT INTO users (login,password,role,balance,approved)
+    VALUES ('administrator','małpyigoryle23_','admin',999999,true)
     ON CONFLICT (login) DO NOTHING
   `);
 }
