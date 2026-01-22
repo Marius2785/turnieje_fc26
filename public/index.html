@@ -86,6 +86,18 @@ button.yellow { background:#ffb703; color:#000 }
   width:90px;
 }
 
+.locked {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.notice {
+  text-align:center;
+  margin-bottom:10px;
+  font-weight:bold;
+  color:#ffb703;
+}
+
 footer {
   position: fixed;
   left: 10px;
@@ -125,6 +137,7 @@ footer {
       <button class="gray" onclick="logout()">Wyloguj</button>
     </div>
 
+    <div id="bettingNotice"></div>
     <div id="matches"></div>
 
     <div id="admin"></div>
@@ -170,6 +183,7 @@ async function logout(){
 
 async function load(){
   const me = await fetch("/api/me").then(r=>r.json());
+  const status = await fetch("/api/status").then(r=>r.json());
 
   if(!me.logged){
     auth.style.display="block";
@@ -183,6 +197,11 @@ async function load(){
   document.getElementById("me").innerText =
     me.login+" | Saldo: "+me.balance+" 💰";
 
+  document.getElementById("bettingNotice").innerHTML =
+    status.bettingOpen
+      ? ""
+      : `<div class="notice">⛔ Obstawianie jest obecnie zablokowane</div>`;
+
   const matches = await fetch("/api/matches").then(r=>r.json());
   document.getElementById("matches").innerHTML =
     matches.map(m=>{
@@ -191,7 +210,7 @@ async function load(){
       const oddsB = m.oddsB ?? 2.5;
 
       return `
-        <div class="card match">
+        <div class="card match ${status.bettingOpen ? "" : "locked"}">
           <div>
             <b>${m.a} vs ${m.b}</b><br>
             Status: OTWARTY
@@ -221,6 +240,10 @@ async function load(){
         <input id="a" placeholder="Gracz A">
         <input id="b" placeholder="Gracz B">
         <button onclick="addMatch()">Dodaj mecz</button>
+        <hr>
+        <button id="lockBtn" class="yellow" onclick="toggleBetting(${status.bettingOpen})">
+          ${status.bettingOpen ? "🔒 Zablokuj obstawianie" : "🔓 Odblokuj obstawianie"}
+        </button>
       </div>
 
       <div class="card">
@@ -259,6 +282,13 @@ async function cancelMatch(id){
   if(!confirm("Na pewno anulować mecz?")) return;
   await api("/api/admin/cancel",{id});
   alert("Mecz anulowany — stawki zwrócone");
+  load();
+}
+
+/* ===== GLOBALNA BLOKADA ===== */
+
+async function toggleBetting(current){
+  await api("/api/admin/toggle-betting",{open: !current});
   load();
 }
 
