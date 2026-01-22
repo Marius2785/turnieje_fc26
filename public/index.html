@@ -168,7 +168,7 @@ async function doRegister(){
     login:rlogin.value,
     password:rpassword.value
   });
-  msg.innerText = r.error || "Zarejestrowano";
+  msg.innerText = r.error || "Zarejestrowano — konto czeka na akceptację admina";
 }
 
 async function logout(){
@@ -304,11 +304,19 @@ async function loadUsers(){
     users.map(u=>`
       <div class="user-row">
         <b>${u.login}</b>
+        ${u.approved ? "" : `<span style="color:#ffb703">(OCZEKUJE)</span>`}
         <input type="number" value="${u.balance}" id="bal-${u.id}">
         <button class="green" onclick="saveBalance(${u.id})">💾</button>
+        ${u.approved ? "" : `<button class="yellow" onclick="approveUser(${u.id})">✔</button>`}
         <button class="red" onclick="deleteUser(${u.id})">🗑</button>
       </div>
     `).join("");
+}
+
+async function approveUser(id){
+  await api("/api/admin/approveUser",{userId:id});
+  alert("Konto zaakceptowane");
+  load();
 }
 
 async function saveBalance(id){
