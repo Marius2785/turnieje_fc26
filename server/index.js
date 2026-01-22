@@ -72,16 +72,25 @@ app.get("/api/me", (req, res) => {
 /* ================= MATCHES ================= */
 
 app.get("/api/matches", async (req, res) => {
-  const { rows } = await pool.query(
-    "SELECT id,a,b,oddsA,oddsD,oddsB,status FROM matches WHERE status='open'"
-  );
+  const { rows } = await pool.query(`
+    SELECT 
+      id,
+      a,
+      b,
+      oddsa AS "oddsA",
+      oddsd AS "oddsD",
+      oddsb AS "oddsB",
+      status
+    FROM matches
+    WHERE status='open'
+  `);
   res.json(rows);
 });
 
-/* ================= ODDS — REALNY SYSTEM ================= */
+/* ================= ODDS ================= */
 
 function calculateOdds(a, d, b) {
-  const base = 100; // stabilizacja startu
+  const base = 100; // stabilizacja
   const total = a + d + b + base * 3;
 
   const pA = (a + base) / total;
@@ -146,11 +155,11 @@ app.post("/api/bet", async (req, res) => {
   const o = calculateOdds(a, d, b);
 
   await pool.query(
-    "UPDATE matches SET oddsA=$1, oddsD=$2, oddsB=$3 WHERE id=$4",
+    "UPDATE matches SET oddsa=$1, oddsd=$2, oddsb=$3 WHERE id=$4",
     [o.oddsA, o.oddsD, o.oddsB, matchId]
   );
 
-  res.json({ ok: true, odds: o });
+  res.json({ ok: true });
 });
 
 /* ================= ADMIN ================= */
@@ -165,7 +174,7 @@ app.post("/api/admin/match", admin, async (req, res) => {
   const { a, b } = req.body;
 
   await pool.query(
-    "INSERT INTO matches (a,b,oddsA,oddsD,oddsB,status) VALUES ($1,$2,2.5,2.5,2.5,'open')",
+    "INSERT INTO matches (a,b,oddsa,oddsd,oddsb,status) VALUES ($1,$2,2.5,2.5,2.5,'open')",
     [a, b]
   );
 
