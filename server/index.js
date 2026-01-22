@@ -49,7 +49,6 @@ app.post("/api/login", async (req, res) => {
   const user = rows[0];
   if (!user) return res.json({ error: "Złe dane" });
 
-  // 🔥 admin zawsze może
   if (user.role !== "admin" && !user.approved)
     return res.json({ error: "Konto czeka na akceptację administracji" });
 
@@ -91,6 +90,32 @@ app.get("/api/matches", async (req, res) => {
   res.json(rows);
 });
 
+/* ================= SETTINGS ================= */
+
+async function getBettingOpen() {
+  const { rows } = await pool.query(
+    "SELECT value FROM settings WHERE key='betting_open'"
+  );
+  return rows[0]?.value === "true";
+}
+
+app.get("/api/bettingStatus", async (req, res) => {
+  const open = await getBettingOpen();
+  res.json({ open });
+});
+
+app.post("/api/admin/toggleBetting", admin, async (req, res) => {
+  const open = await getBettingOpen();
+  const next = open ? "false" : "true";
+
+  await pool.query(
+    "UPDATE settings SET value=$1 WHERE key='betting_open'",
+    [next]
+  );
+
+  res.json({ ok: true, open: next === "true" });
+});
+
 /* ================= ODDS ================= */
 
 function calculateOdds(a, d, b) {
@@ -116,6 +141,10 @@ function calculateOdds(a, d, b) {
 app.post("/api/bet", async (req, res) => {
   if (!req.session.user)
     return res.json({ error: "Brak loginu" });
+
+  const bettingOpen = await getBettingOpen();
+  if (!bettingOpen)
+    return res.json({ error: "Obstawianie jest chwilowo zablokowane" });
 
   const { matchId, pick, amount } = req.body;
   const stake = Number(amount);
