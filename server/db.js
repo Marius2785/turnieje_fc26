@@ -1,24 +1,25 @@
-import { createClient } from "@libsql/client";
+import pkg from "pg";
+const { Pool } = pkg;
 
-export const db = createClient({
-  url: process.env.DATABASE_URL,
-  authToken: process.env.DATABASE_TOKEN
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
 async function init() {
-  await db.execute(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      login TEXT UNIQUE,
-      password TEXT,
+      id SERIAL PRIMARY KEY,
+      login TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
       balance INTEGER DEFAULT 1000,
       role TEXT DEFAULT 'user'
     )
   `);
 
-  await db.execute(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS matches (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       a TEXT,
       b TEXT,
       oddsA REAL,
@@ -28,19 +29,20 @@ async function init() {
     )
   `);
 
-  await db.execute(`
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS bets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER,
-      match_id INTEGER,
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id),
+      match_id INTEGER REFERENCES matches(id),
       pick TEXT,
       amount INTEGER
     )
   `);
 
-  await db.execute(`
-    INSERT OR IGNORE INTO users (login,password,role,balance)
+  await pool.query(`
+    INSERT INTO users (login,password,role,balance)
     VALUES ('administrator','małpyigoryle23_','admin',999999)
+    ON CONFLICT (login) DO NOTHING
   `);
 }
 
