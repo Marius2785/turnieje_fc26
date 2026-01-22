@@ -49,7 +49,8 @@ app.post("/api/login", async (req, res) => {
   const user = rows[0];
   if (!user) return res.json({ error: "Złe dane" });
 
-  if (!user.approved)
+  // 🔥 admin zawsze może
+  if (user.role !== "admin" && !user.approved)
     return res.json({ error: "Konto czeka na akceptację administracji" });
 
   req.session.user = user;
@@ -153,7 +154,6 @@ app.post("/api/bet", async (req, res) => {
   `, [matchId]);
 
   const { a, d, b } = sumsRes.rows[0];
-
   const o = calculateOdds(a, d, b);
 
   await pool.query(
@@ -239,7 +239,7 @@ app.post("/api/admin/cancel", admin, async (req, res) => {
   res.json({ ok: true });
 });
 
-/* ======= ADMIN — BETY NA MECZ ======= */
+/* ======= 🆕 ADMIN — BETY NA MECZ ======= */
 
 app.get("/api/admin/matchBets/:id", admin, async (req, res) => {
   const { id } = req.params;
@@ -253,6 +253,21 @@ app.get("/api/admin/matchBets/:id", admin, async (req, res) => {
   `, [id]);
 
   res.json(rows);
+});
+
+/* ======= 🆕 ADMIN — OCZEKUJĄCE KONTA ======= */
+
+app.get("/api/admin/pendingUsers", admin, async (req, res) => {
+  const { rows } = await pool.query(
+    "SELECT id, login FROM users WHERE approved=false AND role!='admin' ORDER BY login"
+  );
+  res.json(rows);
+});
+
+app.post("/api/admin/approveUser", admin, async (req, res) => {
+  const { userId } = req.body;
+  await pool.query("UPDATE users SET approved=true WHERE id=$1", [userId]);
+  res.json({ ok: true });
 });
 
 /* ======= ADMIN — UŻYTKOWNICY ======= */
@@ -282,19 +297,6 @@ app.post("/api/admin/deleteUser", admin, async (req, res) => {
 
   await pool.query("DELETE FROM bets WHERE user_id=$1", [userId]);
   await pool.query("DELETE FROM users WHERE id=$1", [userId]);
-
-  res.json({ ok: true });
-});
-
-/* ======= 🆕 ADMIN — AKCEPTACJA KONT ======= */
-
-app.post("/api/admin/approveUser", admin, async (req, res) => {
-  const { userId } = req.body;
-
-  await pool.query(
-    "UPDATE users SET approved=true WHERE id=$1",
-    [userId]
-  );
 
   res.json({ ok: true });
 });
