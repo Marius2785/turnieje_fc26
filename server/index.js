@@ -29,10 +29,10 @@ app.post("/api/register", async (req, res) => {
 
   try {
     await pool.query(
-      "INSERT INTO users (login,password,balance,role) VALUES ($1,$2,1000,'user')",
+      "INSERT INTO users (login,password,balance,role,approved) VALUES ($1,$2,1000,'user',false)",
       [login, password]
     );
-    res.json({ ok: true });
+    res.json({ ok: true, pending: true });
   } catch {
     res.json({ error: "Login zajęty" });
   }
@@ -48,6 +48,9 @@ app.post("/api/login", async (req, res) => {
 
   const user = rows[0];
   if (!user) return res.json({ error: "Złe dane" });
+
+  if (!user.approved)
+    return res.json({ error: "Konto czeka na akceptację administracji" });
 
   req.session.user = user;
   res.json({ ok: true });
@@ -90,7 +93,7 @@ app.get("/api/matches", async (req, res) => {
 /* ================= ODDS ================= */
 
 function calculateOdds(a, d, b) {
-  const base = 100; // stabilizacja
+  const base = 100;
   const total = a + d + b + base * 3;
 
   const pA = (a + base) / total;
@@ -98,7 +101,6 @@ function calculateOdds(a, d, b) {
   const pB = (b + base) / total;
 
   const margin = 0.1;
-
   const round = x => Number((x * (1 - margin)).toFixed(2));
 
   return {
@@ -237,7 +239,7 @@ app.post("/api/admin/cancel", admin, async (req, res) => {
   res.json({ ok: true });
 });
 
-/* ======= 🆕 ADMIN — BETY NA MECZ ======= */
+/* ======= ADMIN — BETY NA MECZ ======= */
 
 app.get("/api/admin/matchBets/:id", admin, async (req, res) => {
   const { id } = req.params;
@@ -257,7 +259,7 @@ app.get("/api/admin/matchBets/:id", admin, async (req, res) => {
 
 app.get("/api/admin/users", admin, async (req, res) => {
   const { rows } = await pool.query(
-    "SELECT id, login, balance, role FROM users ORDER BY login"
+    "SELECT id, login, balance, role, approved FROM users ORDER BY login"
   );
   res.json(rows);
 });
@@ -280,6 +282,19 @@ app.post("/api/admin/deleteUser", admin, async (req, res) => {
 
   await pool.query("DELETE FROM bets WHERE user_id=$1", [userId]);
   await pool.query("DELETE FROM users WHERE id=$1", [userId]);
+
+  res.json({ ok: true });
+});
+
+/* ======= 🆕 ADMIN — AKCEPTACJA KONT ======= */
+
+app.post("/api/admin/approveUser", admin, async (req, res) => {
+  const { userId } = req.body;
+
+  await pool.query(
+    "UPDATE users SET approved=true WHERE id=$1",
+    [userId]
+  );
 
   res.json({ ok: true });
 });
