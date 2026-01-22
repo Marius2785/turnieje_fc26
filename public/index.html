@@ -86,16 +86,12 @@ button.yellow { background:#ffb703; color:#000 }
   width:90px;
 }
 
-.locked {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.notice {
-  text-align:center;
-  margin-bottom:10px;
-  font-weight:bold;
-  color:#ffb703;
+.bets-box {
+  margin-top: 10px;
+  background: rgba(0,0,0,0.25);
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
 }
 
 footer {
@@ -137,7 +133,6 @@ footer {
       <button class="gray" onclick="logout()">Wyloguj</button>
     </div>
 
-    <div id="bettingNotice"></div>
     <div id="matches"></div>
 
     <div id="admin"></div>
@@ -183,7 +178,6 @@ async function logout(){
 
 async function load(){
   const me = await fetch("/api/me").then(r=>r.json());
-  const status = await fetch("/api/status").then(r=>r.json());
 
   if(!me.logged){
     auth.style.display="block";
@@ -197,11 +191,6 @@ async function load(){
   document.getElementById("me").innerText =
     me.login+" | Saldo: "+me.balance+" 💰";
 
-  document.getElementById("bettingNotice").innerHTML =
-    status.bettingOpen
-      ? ""
-      : `<div class="notice">⛔ Obstawianie jest obecnie zablokowane</div>`;
-
   const matches = await fetch("/api/matches").then(r=>r.json());
   document.getElementById("matches").innerHTML =
     matches.map(m=>{
@@ -210,18 +199,18 @@ async function load(){
       const oddsB = m.oddsB ?? 2.5;
 
       return `
-        <div class="card match ${status.bettingOpen ? "" : "locked"}">
+        <div class="card match" onclick="${me.admin ? `toggleBets(${m.id})` : ""}">
           <div>
             <b>${m.a} vs ${m.b}</b><br>
             Status: OTWARTY
           </div>
           <div class="odds">
-            <button onclick="bet(${m.id},'a')">${m.a} (${oddsA})</button>
-            <button onclick="bet(${m.id},'d')">Remis (${oddsD})</button>
-            <button onclick="bet(${m.id},'b')">${m.b} (${oddsB})</button>
+            <button onclick="bet(${m.id},'a');event.stopPropagation()">${m.a} (${oddsA})</button>
+            <button onclick="bet(${m.id},'d');event.stopPropagation()">Remis (${oddsD})</button>
+            <button onclick="bet(${m.id},'b');event.stopPropagation()">${m.b} (${oddsB})</button>
 
             ${me.admin ? `
-              <div class="admin-actions">
+              <div class="admin-actions" onclick="event.stopPropagation()">
                 <button class="green" onclick="finish(${m.id},'a')">1</button>
                 <button class="yellow" onclick="finish(${m.id},'d')">X</button>
                 <button class="red" onclick="finish(${m.id},'b')">2</button>
@@ -229,6 +218,8 @@ async function load(){
               </div>
             ` : ""}
           </div>
+
+          ${me.admin ? `<div id="bets-${m.id}" class="bets-box" style="display:none"></div>` : ""}
         </div>
       `;
     }).join("");
@@ -240,10 +231,6 @@ async function load(){
         <input id="a" placeholder="Gracz A">
         <input id="b" placeholder="Gracz B">
         <button onclick="addMatch()">Dodaj mecz</button>
-        <hr>
-        <button id="lockBtn" class="yellow" onclick="toggleBetting(${status.bettingOpen})">
-          ${status.bettingOpen ? "🔒 Zablokuj obstawianie" : "🔓 Odblokuj obstawianie"}
-        </button>
       </div>
 
       <div class="card">
@@ -285,11 +272,28 @@ async function cancelMatch(id){
   load();
 }
 
-/* ===== GLOBALNA BLOKADA ===== */
+/* ===== ADMIN — BETY NA MECZ ===== */
 
-async function toggleBetting(current){
-  await api("/api/admin/toggle-betting",{open: !current});
-  load();
+async function toggleBets(matchId){
+  const box = document.getElementById("bets-"+matchId);
+  if(!box) return;
+
+  if(box.style.display === "block"){
+    box.style.display = "none";
+    return;
+  }
+
+  const bets = await fetch("/api/admin/matchBets/"+matchId).then(r=>r.json());
+
+  if(bets.length === 0){
+    box.innerHTML = "Brak zakładów";
+  } else {
+    box.innerHTML = bets.map(b=>
+      `• ${b.login} — ${b.pick.toUpperCase()} — ${b.amount} 💰`
+    ).join("<br>");
+  }
+
+  box.style.display = "block";
 }
 
 /* ===== ADMIN — UŻYTKOWNICY ===== */
