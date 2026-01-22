@@ -185,28 +185,34 @@ async function load(){
 
   const matches = await fetch("/api/matches").then(r=>r.json());
   document.getElementById("matches").innerHTML =
-    matches.map(m=>`
-      <div class="card match">
-        <div>
-          <b>${m.a} vs ${m.b}</b><br>
-          Status: OTWARTY
-        </div>
-        <div class="odds">
-          <button onclick="bet(${m.id},'a')">${m.a} (${m.oddsA})</button>
-          <button onclick="bet(${m.id},'d')">Remis (${m.oddsD})</button>
-          <button onclick="bet(${m.id},'b')">${m.b} (${m.oddsB})</button>
+    matches.map(m=>{
+      const oddsA = m.oddsA ?? 2.5;
+      const oddsD = m.oddsD ?? 2.5;
+      const oddsB = m.oddsB ?? 2.5;
 
-          ${me.admin ? `
-            <div class="admin-actions">
-              <button class="green" onclick="finish(${m.id},'a')">1</button>
-              <button class="yellow" onclick="finish(${m.id},'d')">X</button>
-              <button class="red" onclick="finish(${m.id},'b')">2</button>
-              <button class="gray" onclick="cancelMatch(${m.id})">⛔</button>
-            </div>
-          ` : ""}
+      return `
+        <div class="card match">
+          <div>
+            <b>${m.a} vs ${m.b}</b><br>
+            Status: OTWARTY
+          </div>
+          <div class="odds">
+            <button onclick="bet(${m.id},'a')">${m.a} (${oddsA})</button>
+            <button onclick="bet(${m.id},'d')">Remis (${oddsD})</button>
+            <button onclick="bet(${m.id},'b')">${m.b} (${oddsB})</button>
+
+            ${me.admin ? `
+              <div class="admin-actions">
+                <button class="green" onclick="finish(${m.id},'a')">1</button>
+                <button class="yellow" onclick="finish(${m.id},'d')">X</button>
+                <button class="red" onclick="finish(${m.id},'b')">2</button>
+                <button class="gray" onclick="cancelMatch(${m.id})">⛔</button>
+              </div>
+            ` : ""}
+          </div>
         </div>
-      </div>
-    `).join("");
+      `;
+    }).join("");
 
   if(me.admin){
     admin.innerHTML = `
