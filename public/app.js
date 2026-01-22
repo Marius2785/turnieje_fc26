@@ -4,18 +4,24 @@ async function load() {
 
   const matches = await fetch("/api/matches").then(r => r.json());
   const tbody = document.querySelector("tbody");
+  if (!tbody) return;
+
   tbody.innerHTML = "";
 
   matches.forEach(m => {
+    const oddsA = m.oddsA ?? 2.5;
+    const oddsD = m.oddsD ?? 2.5;
+    const oddsB = m.oddsB ?? 2.5;
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${m.a}<br>vs<br>${m.b}</td>
       <td>-</td>
       <td>-</td>
       <td>
-        <span class="kurs">1 ${m.oddsA}</span>
-        <span class="kurs">X ${m.oddsD}</span>
-        <span class="kurs">2 ${m.oddsB}</span>
+        <span class="kurs">1 ${oddsA}</span>
+        <span class="kurs">X ${oddsD}</span>
+        <span class="kurs">2 ${oddsB}</span>
       </td>
       <td>
         ${me.admin ? `
