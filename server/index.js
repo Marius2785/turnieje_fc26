@@ -81,16 +81,26 @@ app.get("/api/matches", async (req, res) => {
 /* ================= ODDS ================= */
 
 function calculateOdds(a, d, b) {
-  const buffer = 0.08;
-  const total = a + d + b + 1;
+  const min = 1.25;
+  const max = 8;
+  const margin = 0.12;
 
-  const calc = x =>
-    Math.max(1.2, (total / (x + 1)) * (1 - buffer));
+  const total = a + d + b;
+
+  if (total === 0) {
+    return { oddsA: 2.5, oddsD: 2.5, oddsB: 2.5 };
+  }
+
+  const pA = (a + 50) / (total + 150);
+  const pD = (d + 50) / (total + 150);
+  const pB = (b + 50) / (total + 150);
+
+  const clamp = x => Math.min(max, Math.max(min, x));
 
   return {
-    oddsA: Number(calc(a).toFixed(2)),
-    oddsD: Number(calc(d).toFixed(2)),
-    oddsB: Number(calc(b).toFixed(2))
+    oddsA: Number(clamp((1 / pA) * (1 - margin)).toFixed(2)),
+    oddsD: Number(clamp((1 / pD) * (1 - margin)).toFixed(2)),
+    oddsB: Number(clamp((1 / pB) * (1 - margin)).toFixed(2))
   };
 }
 
@@ -129,7 +139,7 @@ app.post("/api/bet", async (req, res) => {
   req.session.user.balance -= stake;
 
   const sums = await pool.query(
-    "SELECT pick, SUM(amount)::int sum FROM bets WHERE match_id=$1 GROUP BY pick",
+    "SELECT pick, COALESCE(SUM(amount),0)::int sum FROM bets WHERE match_id=$1 GROUP BY pick",
     [matchId]
   );
 
