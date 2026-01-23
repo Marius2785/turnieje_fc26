@@ -278,8 +278,9 @@ async function addMatch(){
 
 async function finish(id,result){
   if(!confirm("Na pewno zakończyć mecz?")) return;
-  await api("/api/admin/finish",{id,result});
-  alert("Mecz zakończony — wypłaty rozdane");
+  const r = await api("/api/admin/finish",{id,result});
+  if(r.error) alert(r.error);
+  else alert("Mecz zakończony — wypłaty rozdane");
   load();
 }
 
