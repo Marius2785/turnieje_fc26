@@ -192,10 +192,11 @@ app.post("/api/bet", async (req, res) => {
 
   const { a, d, b } = sumsRes.rows[0];
 
+  // ✅ TU BYŁ BŁĄD — TERAZ BIERZEMY PRAWDZIWE KOLUMNY
   const baseOdds = {
-    oddsA: match.oddsa ?? match.oddsA,
-    oddsD: match.oddsd ?? match.oddsD,
-    oddsB: match.oddsb ?? match.oddsB
+    oddsA: match.oddsA,
+    oddsD: match.oddsD,
+    oddsB: match.oddsB
   };
 
   const o = calculateOdds(a, d, b, baseOdds);
