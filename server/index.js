@@ -228,7 +228,10 @@ app.post("/api/admin/match", admin, async (req, res) => {
 app.post("/api/admin/finish", admin, async (req, res) => {
   const { id, result } = req.body;
 
-  const matchRes = await pool.query("SELECT * FROM matches WHERE id=$1", [id]);
+  const matchRes = await pool.query(
+    "SELECT oddsa, oddsd, oddsb FROM matches WHERE id=$1",
+    [id]
+  );
   const match = matchRes.rows[0];
   if (!match) return res.json({ error: "Brak meczu" });
 
