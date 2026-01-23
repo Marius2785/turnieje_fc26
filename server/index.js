@@ -226,37 +226,39 @@ app.post("/api/admin/match", admin, async (req, res) => {
 /* ======= ZAKOŃCZENIE MECZU ======= */
 
 app.post("/api/admin/finish", admin, async (req, res) => {
-  const { id, result } = req.body;
+  try {
+    const { id, result } = req.body;
 
-  const matchRes = await pool.query(
-    "SELECT oddsa, oddsd, oddsb FROM matches WHERE id=$1",
-    [id]
-  );
-  const match = matchRes.rows[0];
-  if (!match) return res.json({ error: "Brak meczu" });
+    const matchRes = await pool.query("SELECT * FROM matches WHERE id=$1", [id]);
+    const match = matchRes.rows[0];
+    if (!match) return res.json({ error: "Brak meczu" });
 
-  const odds =
-    result === "a" ? match.oddsa :
-    result === "d" ? match.oddsd :
-    match.oddsb;
+    const odds =
+      result === "a" ? match.oddsa :
+      result === "d" ? match.oddsd :
+      match.oddsb;
 
-  const betsRes = await pool.query(
-    "SELECT * FROM bets WHERE match_id=$1 AND pick=$2",
-    [id, result]
-  );
-
-  for (const b of betsRes.rows) {
-    const win = b.amount * odds;
-    await pool.query(
-      "UPDATE users SET balance=balance+$1 WHERE id=$2",
-      [win, b.user_id]
+    const betsRes = await pool.query(
+      "SELECT * FROM bets WHERE match_id=$1 AND pick=$2",
+      [id, result]
     );
+
+    for (const b of betsRes.rows) {
+      const win = Math.round(b.amount * odds);
+      await pool.query(
+        "UPDATE users SET balance=balance+$1 WHERE id=$2",
+        [win, b.user_id]
+      );
+    }
+
+    await pool.query("DELETE FROM bets WHERE match_id=$1", [id]);
+    await pool.query("DELETE FROM matches WHERE id=$1", [id]);
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("FINISH ERROR:", e);
+    res.json({ error: "Błąd serwera przy kończeniu meczu" });
   }
-
-  await pool.query("DELETE FROM bets WHERE match_id=$1", [id]);
-  await pool.query("DELETE FROM matches WHERE id=$1", [id]);
-
-  res.json({ ok: true });
 });
 
 /* ======= ANULOWANIE MECZU ======= */
