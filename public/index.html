@@ -194,9 +194,9 @@ async function load(){
   const matches = await fetch("/api/matches").then(r=>r.json());
   document.getElementById("matches").innerHTML =
     matches.map(m=>{
-      const oddsA = Number(m.oddsA).toFixed(2);
-      const oddsD = Number(m.oddsD).toFixed(2);
-      const oddsB = Number(m.oddsB).toFixed(2);
+      const oddsA = Number(m.oddsA || 2.5).toFixed(2);
+      const oddsD = Number(m.oddsD || 2.5).toFixed(2);
+      const oddsB = Number(m.oddsB || 2.5).toFixed(2);
 
       return `
         <div class="card match" onclick="${me.admin ? `toggleBets(${m.id})` : ""}">
