@@ -118,7 +118,7 @@ app.post("/api/admin/toggleBetting", admin, async (req, res) => {
 
 /* ================= ODDS ================= */
 
-function calculateOdds(a, d, b) {
+function calculateOdds(a, d, b, baseOdds) {
   const base = 100;
   const total = a + d + b + base * 3;
 
@@ -130,9 +130,9 @@ function calculateOdds(a, d, b) {
   const round = x => Number((x * (1 - margin)).toFixed(2));
 
   return {
-    oddsA: round(1 / pA),
-    oddsD: round(1 / pD),
-    oddsB: round(1 / pB)
+    oddsA: round((1 / pA) * baseOdds.oddsA / 2.5),
+    oddsD: round((1 / pD) * baseOdds.oddsD / 2.5),
+    oddsB: round((1 / pB) * baseOdds.oddsB / 2.5)
   };
 }
 
@@ -183,7 +183,14 @@ app.post("/api/bet", async (req, res) => {
   `, [matchId]);
 
   const { a, d, b } = sumsRes.rows[0];
-  const o = calculateOdds(a, d, b);
+
+  const baseOdds = {
+    oddsA: match.oddsa,
+    oddsD: match.oddsd,
+    oddsB: match.oddsb
+  };
+
+  const o = calculateOdds(a, d, b, baseOdds);
 
   await pool.query(
     "UPDATE matches SET oddsa=$1, oddsd=$2, oddsb=$3 WHERE id=$4",
@@ -202,11 +209,15 @@ function admin(req, res, next) {
 }
 
 app.post("/api/admin/match", admin, async (req, res) => {
-  const { a, b } = req.body;
+  let { a, b, oddsA, oddsD, oddsB } = req.body;
+
+  oddsA = Number(oddsA) || 2.5;
+  oddsD = Number(oddsD) || 2.5;
+  oddsB = Number(oddsB) || 2.5;
 
   await pool.query(
-    "INSERT INTO matches (a,b,oddsa,oddsd,oddsb,status) VALUES ($1,$2,2.5,2.5,2.5,'open')",
-    [a, b]
+    "INSERT INTO matches (a,b,oddsa,oddsd,oddsb,status) VALUES ($1,$2,$3,$4,$5,'open')",
+    [a, b, oddsA, oddsD, oddsB]
   );
 
   res.json({ ok: true });
@@ -284,7 +295,7 @@ app.get("/api/admin/matchBets/:id", admin, async (req, res) => {
   res.json(rows);
 });
 
-/* ======= 🆕 ADMIN — OCZEKUJĄCE KONTA ======= */
+/* ======= ADMIN — OCZEKUJĄCE KONTA ======= */
 
 app.get("/api/admin/pendingUsers", admin, async (req, res) => {
   const { rows } = await pool.query(
