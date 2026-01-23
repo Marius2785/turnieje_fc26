@@ -94,16 +94,6 @@ button.yellow { background:#ffb703; color:#000 }
   font-size: 13px;
 }
 
-.notice {
-  background:#ffb703;
-  color:#000;
-  padding:10px;
-  border-radius:8px;
-  margin-bottom:10px;
-  text-align:center;
-  font-weight:bold;
-}
-
 footer {
   position: fixed;
   left: 10px;
@@ -143,7 +133,6 @@ footer {
       <button class="gray" onclick="logout()">Wyloguj</button>
     </div>
 
-    <div id="bettingNotice"></div>
     <div id="matches"></div>
 
     <div id="admin"></div>
@@ -203,13 +192,6 @@ async function load(){
     me.login+" | Saldo: "+me.balance+" 💰";
 
   const bettingStatus = await fetch("/api/bettingStatus").then(r=>r.json());
-
-  const noticeBox = document.getElementById("bettingNotice");
-  if(!bettingStatus.open){
-    noticeBox.innerHTML = `<div class="notice">${bettingStatus.message}</div>`;
-  } else {
-    noticeBox.innerHTML = "";
-  }
 
   const matches = await fetch("/api/matches").then(r=>r.json());
   document.getElementById("matches").innerHTML =
