@@ -92,25 +92,33 @@ app.get("/api/matches", async (req, res) => {
 
 /* ================= SETTINGS ================= */
 
-async function getBettingOpen() {
+async function getBettingRow() {
   const { rows } = await pool.query(
-    "SELECT value FROM settings WHERE key='betting_open'"
+    "SELECT value, message FROM settings WHERE key='betting_open'"
   );
-  return rows[0]?.value === "true";
+  return rows[0];
 }
 
 app.get("/api/bettingStatus", async (req, res) => {
-  const open = await getBettingOpen();
-  res.json({ open });
+  const row = await getBettingRow();
+  res.json({
+    open: row?.value === "true",
+    message: row?.message || "Obstawianie jest obecnie zablokowane"
+  });
 });
 
 app.post("/api/admin/toggleBetting", admin, async (req, res) => {
-  const open = await getBettingOpen();
+  const row = await getBettingRow();
+  const open = row?.value === "true";
   const next = open ? "false" : "true";
 
+  const msg = open
+    ? "Obstawianie zostało zablokowane przez administrację"
+    : "";
+
   await pool.query(
-    "UPDATE settings SET value=$1 WHERE key='betting_open'",
-    [next]
+    "UPDATE settings SET value=$1, message=$2 WHERE key='betting_open'",
+    [next, msg]
   );
 
   res.json({ ok: true, open: next === "true" });
@@ -142,9 +150,9 @@ app.post("/api/bet", async (req, res) => {
   if (!req.session.user)
     return res.json({ error: "Brak loginu" });
 
-  const bettingOpen = await getBettingOpen();
-  if (!bettingOpen)
-    return res.json({ error: "Obstawianie jest chwilowo zablokowane" });
+  const betting = await getBettingRow();
+  if (!betting || betting.value !== "true")
+    return res.json({ error: betting?.message || "Obstawianie zablokowane" });
 
   const { matchId, pick, amount } = req.body;
   const stake = Number(amount);
