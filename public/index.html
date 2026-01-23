@@ -234,6 +234,9 @@ async function load(){
         <h3>Panel admina</h3>
         <input id="a" placeholder="Gracz A">
         <input id="b" placeholder="Gracz B">
+        <input id="oddsA" placeholder="Kurs A (np 2.1)">
+        <input id="oddsD" placeholder="Kurs X (np 3.0)">
+        <input id="oddsB" placeholder="Kurs B (np 1.8)">
         <button onclick="addMatch()">Dodaj mecz</button>
         <button id="betToggleBtn" class="yellow" onclick="toggleBetting()">...</button>
       </div>
@@ -265,7 +268,10 @@ async function bet(id,pick){
 async function addMatch(){
   await api("/api/admin/match",{
     a:a.value,
-    b:b.value
+    b:b.value,
+    oddsA: oddsA.value,
+    oddsD: oddsD.value,
+    oddsB: oddsB.value
   });
   load();
 }
