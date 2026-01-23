@@ -80,9 +80,9 @@ app.get("/api/matches", async (req, res) => {
       id,
       a,
       b,
-      COALESCE(oddsa,2.5)::float AS "oddsA",
-      COALESCE(oddsd,2.5)::float AS "oddsD",
-      COALESCE(oddsb,2.5)::float AS "oddsB",
+      oddsa AS "oddsA",
+      oddsd AS "oddsD",
+      oddsb AS "oddsB",
       status
     FROM matches
     WHERE status='open'
@@ -103,12 +103,6 @@ app.get("/api/bettingStatus", async (req, res) => {
   const open = await getBettingOpen();
   res.json({ open });
 });
-
-function admin(req, res, next) {
-  if (!req.session.user || req.session.user.role !== "admin")
-    return res.json({ error: "Brak dostępu" });
-  next();
-}
 
 app.post("/api/admin/toggleBetting", admin, async (req, res) => {
   const open = await getBettingOpen();
@@ -132,13 +126,13 @@ function calculateOdds(a, d, b, baseOdds) {
   const pD = (d + base) / total;
   const pB = (b + base) / total;
 
-  const margin = 0.08;
-  const round = x => Number(x.toFixed(2));
+  const margin = 0.1;
+  const round = x => Number((x * (1 - margin)).toFixed(2));
 
   return {
-    oddsA: round((1 / pA) * (baseOdds.oddsA / 2.5)),
-    oddsD: round((1 / pD) * (baseOdds.oddsD / 2.5)),
-    oddsB: round((1 / pB) * (baseOdds.oddsB / 2.5))
+    oddsA: round((1 / pA) * baseOdds.oddsA / 2.5),
+    oddsD: round((1 / pD) * baseOdds.oddsD / 2.5),
+    oddsB: round((1 / pB) * baseOdds.oddsB / 2.5)
   };
 }
 
@@ -191,9 +185,9 @@ app.post("/api/bet", async (req, res) => {
   const { a, d, b } = sumsRes.rows[0];
 
   const baseOdds = {
-    oddsA: Number(match.oddsa) || 2.5,
-    oddsD: Number(match.oddsd) || 2.5,
-    oddsB: Number(match.oddsb) || 2.5
+    oddsA: match.oddsa,
+    oddsD: match.oddsd,
+    oddsB: match.oddsb
   };
 
   const o = calculateOdds(a, d, b, baseOdds);
@@ -207,6 +201,12 @@ app.post("/api/bet", async (req, res) => {
 });
 
 /* ================= ADMIN ================= */
+
+function admin(req, res, next) {
+  if (!req.session.user || req.session.user.role !== "admin")
+    return res.json({ error: "Brak dostępu" });
+  next();
+}
 
 app.post("/api/admin/match", admin, async (req, res) => {
   let { a, b, oddsA, oddsD, oddsB } = req.body;
