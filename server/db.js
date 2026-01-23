@@ -13,14 +13,9 @@ async function init() {
       login TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       balance INTEGER DEFAULT 1000,
-      role TEXT DEFAULT 'user'
+      role TEXT DEFAULT 'user',
+      approved BOOLEAN DEFAULT false
     )
-  `);
-
-  // 🆕 dodaj kolumnę approved jeśli nie istnieje
-  await pool.query(`
-    ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT false
   `);
 
   await pool.query(`
