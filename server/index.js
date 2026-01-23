@@ -80,9 +80,9 @@ app.get("/api/matches", async (req, res) => {
       id,
       a,
       b,
-      oddsa AS "oddsA",
-      oddsd AS "oddsD",
-      oddsb AS "oddsB",
+      oddsA,
+      oddsD,
+      oddsB,
       status
     FROM matches
     WHERE status='open'
@@ -103,6 +103,14 @@ app.get("/api/bettingStatus", async (req, res) => {
   const open = await getBettingOpen();
   res.json({ open });
 });
+
+/* ================= ADMIN ================= */
+
+function admin(req, res, next) {
+  if (!req.session.user || req.session.user.role !== "admin")
+    return res.json({ error: "Brak dostępu" });
+  next();
+}
 
 app.post("/api/admin/toggleBetting", admin, async (req, res) => {
   const open = await getBettingOpen();
@@ -185,28 +193,22 @@ app.post("/api/bet", async (req, res) => {
   const { a, d, b } = sumsRes.rows[0];
 
   const baseOdds = {
-    oddsA: match.oddsa,
-    oddsD: match.oddsd,
-    oddsB: match.oddsb
+    oddsA: match.oddsa ?? match.oddsA,
+    oddsD: match.oddsd ?? match.oddsD,
+    oddsB: match.oddsb ?? match.oddsB
   };
 
   const o = calculateOdds(a, d, b, baseOdds);
 
   await pool.query(
-    "UPDATE matches SET oddsa=$1, oddsd=$2, oddsb=$3 WHERE id=$4",
+    "UPDATE matches SET oddsA=$1, oddsD=$2, oddsB=$3 WHERE id=$4",
     [o.oddsA, o.oddsD, o.oddsB, matchId]
   );
 
   res.json({ ok: true });
 });
 
-/* ================= ADMIN ================= */
-
-function admin(req, res, next) {
-  if (!req.session.user || req.session.user.role !== "admin")
-    return res.json({ error: "Brak dostępu" });
-  next();
-}
+/* ================= ADMIN — MATCH ================= */
 
 app.post("/api/admin/match", admin, async (req, res) => {
   let { a, b, oddsA, oddsD, oddsB } = req.body;
@@ -216,7 +218,7 @@ app.post("/api/admin/match", admin, async (req, res) => {
   oddsB = Number(oddsB) || 2.5;
 
   await pool.query(
-    "INSERT INTO matches (a,b,oddsa,oddsd,oddsb,status) VALUES ($1,$2,$3,$4,$5,'open')",
+    "INSERT INTO matches (a,b,oddsA,oddsD,oddsB,status) VALUES ($1,$2,$3,$4,$5,'open')",
     [a, b, oddsA, oddsD, oddsB]
   );
 
@@ -228,14 +230,17 @@ app.post("/api/admin/match", admin, async (req, res) => {
 app.post("/api/admin/finish", admin, async (req, res) => {
   const { id, result } = req.body;
 
-  const matchRes = await pool.query("SELECT * FROM matches WHERE id=$1", [id]);
+  const matchRes = await pool.query(
+    "SELECT * FROM matches WHERE id=$1",
+    [id]
+  );
   const match = matchRes.rows[0];
   if (!match) return res.json({ error: "Brak meczu" });
 
   const odds =
-    result === "a" ? match.oddsa :
-    result === "d" ? match.oddsd :
-    match.oddsb;
+    result === "a" ? match.oddsA :
+    result === "d" ? match.oddsD :
+    match.oddsB;
 
   const betsRes = await pool.query(
     "SELECT * FROM bets WHERE match_id=$1 AND pick=$2",
@@ -243,7 +248,7 @@ app.post("/api/admin/finish", admin, async (req, res) => {
   );
 
   for (const b of betsRes.rows) {
-    const win = b.amount * odds;
+    const win = Math.round(b.amount * odds);
     await pool.query(
       "UPDATE users SET balance=balance+$1 WHERE id=$2",
       [win, b.user_id]
@@ -279,7 +284,7 @@ app.post("/api/admin/cancel", admin, async (req, res) => {
   res.json({ ok: true });
 });
 
-/* ======= 🆕 ADMIN — BETY NA MECZ ======= */
+/* ======= ADMIN — BETY NA MECZ ======= */
 
 app.get("/api/admin/matchBets/:id", admin, async (req, res) => {
   const { id } = req.params;
