@@ -168,7 +168,7 @@ async function doRegister(){
     login:rlogin.value,
     password:rpassword.value
   });
-  msg.innerText = r.error || "Zarejestrowano — konto czeka na akceptację";
+  msg.innerText = r.error || "Zarejestrowano — konto czeka na akceptację admina";
 }
 
 async function logout(){
@@ -191,16 +191,12 @@ async function load(){
   document.getElementById("me").innerText =
     me.login+" | Saldo: "+me.balance+" 💰";
 
-  const bettingStatus = await fetch("/api/bettingStatus").then(r=>r.json());
-
   const matches = await fetch("/api/matches").then(r=>r.json());
   document.getElementById("matches").innerHTML =
     matches.map(m=>{
-      const oddsA = m.oddsA ?? 2.5;
-      const oddsD = m.oddsD ?? 2.5;
-      const oddsB = m.oddsB ?? 2.5;
-
-      const disabled = bettingStatus.open ? "" : "disabled";
+      const oddsA = Number(m.oddsA).toFixed(2);
+      const oddsD = Number(m.oddsD).toFixed(2);
+      const oddsB = Number(m.oddsB).toFixed(2);
 
       return `
         <div class="card match" onclick="${me.admin ? `toggleBets(${m.id})` : ""}">
@@ -209,9 +205,9 @@ async function load(){
             Status: OTWARTY
           </div>
           <div class="odds">
-            <button ${disabled} onclick="bet(${m.id},'a');event.stopPropagation()">${m.a} (${oddsA})</button>
-            <button ${disabled} onclick="bet(${m.id},'d');event.stopPropagation()">Remis (${oddsD})</button>
-            <button ${disabled} onclick="bet(${m.id},'b');event.stopPropagation()">${m.b} (${oddsB})</button>
+            <button onclick="bet(${m.id},'a');event.stopPropagation()">${m.a} (${oddsA})</button>
+            <button onclick="bet(${m.id},'d');event.stopPropagation()">Remis (${oddsD})</button>
+            <button onclick="bet(${m.id},'b');event.stopPropagation()">${m.b} (${oddsB})</button>
 
             ${me.admin ? `
               <div class="admin-actions" onclick="event.stopPropagation()">
@@ -235,15 +231,9 @@ async function load(){
         <input id="a" placeholder="Gracz A">
         <input id="b" placeholder="Gracz B">
         <input id="oddsA" placeholder="Kurs A (np 2.1)">
-        <input id="oddsD" placeholder="Kurs X (np 3.0)">
-        <input id="oddsB" placeholder="Kurs B (np 1.8)">
+        <input id="oddsD" placeholder="Kurs X (np 3.4)">
+        <input id="oddsB" placeholder="Kurs B (np 3.0)">
         <button onclick="addMatch()">Dodaj mecz</button>
-        <button id="betToggleBtn" class="yellow" onclick="toggleBetting()">...</button>
-      </div>
-
-      <div class="card">
-        <h3>Oczekujące konta</h3>
-        <div id="pending"></div>
       </div>
 
       <div class="card">
@@ -252,8 +242,6 @@ async function load(){
       </div>
     `;
     loadUsers();
-    loadPending();
-    updateBetToggleButton();
   }
 }
 
@@ -269,9 +257,9 @@ async function addMatch(){
   await api("/api/admin/match",{
     a:a.value,
     b:b.value,
-    oddsA: oddsA.value,
-    oddsD: oddsD.value,
-    oddsB: oddsB.value
+    oddsA:oddsA.value,
+    oddsD:oddsD.value,
+    oddsB:oddsB.value
   });
   load();
 }
@@ -312,49 +300,6 @@ async function toggleBets(matchId){
   }
 
   box.style.display = "block";
-}
-
-/* ===== ADMIN — BLOKADA OBSTAWIANIA ===== */
-
-async function updateBetToggleButton(){
-  const r = await fetch("/api/bettingStatus").then(r=>r.json());
-  const btn = document.getElementById("betToggleBtn");
-  if(!btn) return;
-
-  if(r.open){
-    btn.innerText = "🔒 Zablokuj obstawianie";
-    btn.className = "red";
-  } else {
-    btn.innerText = "🔓 Odblokuj obstawianie";
-    btn.className = "green";
-  }
-}
-
-async function toggleBetting(){
-  await api("/api/admin/toggleBetting",{});
-  updateBetToggleButton();
-  load();
-}
-
-/* ===== ADMIN — OCZEKUJĄCE KONTA ===== */
-
-async function loadPending(){
-  const users = await fetch("/api/admin/pendingUsers").then(r=>r.json());
-  document.getElementById("pending").innerHTML =
-    users.length === 0 ? "Brak" :
-    users.map(u=>`
-      <div class="user-row">
-        <b>${u.login}</b>
-        <button class="green" onclick="approveUser(${u.id})">✔</button>
-        <button class="red" onclick="deleteUser(${u.id})">✖</button>
-      </div>
-    `).join("");
-}
-
-async function approveUser(id){
-  await api("/api/admin/approveUser",{userId:id});
-  alert("Konto zaakceptowane");
-  load();
 }
 
 /* ===== ADMIN — UŻYTKOWNICY ===== */
