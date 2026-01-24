@@ -118,21 +118,35 @@ app.post("/api/admin/toggleBetting", admin, async (req, res) => {
 
 /* ================= ODDS ================= */
 
+/*
+  NOWY ALGORYTM:
+  - kursy startowe są bazą
+  - zmiany są łagodne
+  - minimalny kurs = 1.05
+  - brak skoków typu 2.5 -> 0.4
+*/
+
 function calculateOdds(a, d, b, baseOdds) {
-  const base = 100;
-  const total = a + d + b + base * 3;
+  const MIN_ODDS = 1.05;
 
-  const pA = (a + base) / total;
-  const pD = (d + base) / total;
-  const pB = (b + base) / total;
+  const total = a + d + b;
+  if (total === 0) return baseOdds;
 
-  const margin = 0.1;
-  const round = x => Number((x * (1 - margin)).toFixed(2));
+  const shareA = a / total;
+  const shareD = d / total;
+  const shareB = b / total;
+
+  const adjust = (base, share) => {
+    // im więcej ludzi obstawia, tym kurs maleje, ale łagodnie
+    const factor = 1 + (0.5 - share); // zakres ~0.5–1.5
+    const value = base * factor;
+    return Math.max(MIN_ODDS, Number(value.toFixed(2)));
+  };
 
   return {
-    oddsA: round((1 / pA) * baseOdds.oddsA / 2.5),
-    oddsD: round((1 / pD) * baseOdds.oddsD / 2.5),
-    oddsB: round((1 / pB) * baseOdds.oddsB / 2.5)
+    oddsA: adjust(baseOdds.oddsA, shareA),
+    oddsD: adjust(baseOdds.oddsD, shareD),
+    oddsB: adjust(baseOdds.oddsB, shareB)
   };
 }
 
