@@ -119,15 +119,19 @@ app.post("/api/admin/toggleBetting", admin, async (req, res) => {
 /* ================= ODDS ================= */
 
 /*
-  NOWY ALGORYTM:
-  - kursy startowe są bazą
-  - zmiany są łagodne
+  PROFESJONALNY MODEL:
+
+  - kursy startowe = baza
+  - liczymy udział % pieniędzy na każde zdarzenie
+  - zmiany są wygładzane (damping)
   - minimalny kurs = 1.05
-  - brak skoków typu 2.5 -> 0.4
+  - brak gwałtownych skoków
 */
 
 function calculateOdds(a, d, b, baseOdds) {
   const MIN_ODDS = 1.05;
+  const MARGIN = 0.08; // marża bukmachera (8%)
+  const DAMPING = 0.6; // im bliżej 1 tym wolniejsze zmiany
 
   const total = a + d + b;
   if (total === 0) return baseOdds;
@@ -136,17 +140,33 @@ function calculateOdds(a, d, b, baseOdds) {
   const shareD = d / total;
   const shareB = b / total;
 
-  const adjust = (base, share) => {
-    // im więcej ludzi obstawia, tym kurs maleje, ale łagodnie
-    const factor = 1 + (0.5 - share); // zakres ~0.5–1.5
-    const value = base * factor;
-    return Math.max(MIN_ODDS, Number(value.toFixed(2)));
+  const fairOdds = {
+    oddsA: 1 / shareA,
+    oddsD: 1 / shareD,
+    oddsB: 1 / shareB
   };
 
+  const withMargin = {
+    oddsA: fairOdds.oddsA * (1 - MARGIN),
+    oddsD: fairOdds.oddsD * (1 - MARGIN),
+    oddsB: fairOdds.oddsB * (1 - MARGIN)
+  };
+
+  const smooth = (current, target) =>
+    current + (target - current) * (1 - DAMPING);
+
+  const result = {
+    oddsA: smooth(baseOdds.oddsA, withMargin.oddsA),
+    oddsD: smooth(baseOdds.oddsD, withMargin.oddsD),
+    oddsB: smooth(baseOdds.oddsB, withMargin.oddsB)
+  };
+
+  const clamp = v => Math.max(MIN_ODDS, Number(v.toFixed(2)));
+
   return {
-    oddsA: adjust(baseOdds.oddsA, shareA),
-    oddsD: adjust(baseOdds.oddsD, shareD),
-    oddsB: adjust(baseOdds.oddsB, shareB)
+    oddsA: clamp(result.oddsA),
+    oddsD: clamp(result.oddsD),
+    oddsB: clamp(result.oddsB)
   };
 }
 
