@@ -116,60 +116,6 @@ app.post("/api/admin/toggleBetting", admin, async (req, res) => {
   res.json({ ok: true, open: next === "true" });
 });
 
-/* ================= ODDS ================= */
-
-/*
-  PROFESJONALNY MODEL:
-
-  - kursy startowe = baza
-  - liczymy udział % pieniędzy na każde zdarzenie
-  - zmiany są wygładzane (damping)
-  - minimalny kurs = 1.05
-  - brak gwałtownych skoków
-*/
-
-function calculateOdds(a, d, b, baseOdds) {
-  const MIN_ODDS = 1.05;
-  const MARGIN = 0.08; // marża bukmachera (8%)
-  const DAMPING = 0.6; // im bliżej 1 tym wolniejsze zmiany
-
-  const total = a + d + b;
-  if (total === 0) return baseOdds;
-
-  const shareA = a / total;
-  const shareD = d / total;
-  const shareB = b / total;
-
-  const fairOdds = {
-    oddsA: 1 / shareA,
-    oddsD: 1 / shareD,
-    oddsB: 1 / shareB
-  };
-
-  const withMargin = {
-    oddsA: fairOdds.oddsA * (1 - MARGIN),
-    oddsD: fairOdds.oddsD * (1 - MARGIN),
-    oddsB: fairOdds.oddsB * (1 - MARGIN)
-  };
-
-  const smooth = (current, target) =>
-    current + (target - current) * (1 - DAMPING);
-
-  const result = {
-    oddsA: smooth(baseOdds.oddsA, withMargin.oddsA),
-    oddsD: smooth(baseOdds.oddsD, withMargin.oddsD),
-    oddsB: smooth(baseOdds.oddsB, withMargin.oddsB)
-  };
-
-  const clamp = v => Math.max(MIN_ODDS, Number(v.toFixed(2)));
-
-  return {
-    oddsA: clamp(result.oddsA),
-    oddsD: clamp(result.oddsD),
-    oddsB: clamp(result.oddsB)
-  };
-}
-
 /* ================= BET ================= */
 
 app.post("/api/bet", async (req, res) => {
@@ -208,28 +154,7 @@ app.post("/api/bet", async (req, res) => {
 
   req.session.user.balance -= stake;
 
-  const sumsRes = await pool.query(`
-    SELECT
-      COALESCE(SUM(CASE WHEN pick='a' THEN amount END),0)::int AS a,
-      COALESCE(SUM(CASE WHEN pick='d' THEN amount END),0)::int AS d,
-      COALESCE(SUM(CASE WHEN pick='b' THEN amount END),0)::int AS b
-    FROM bets WHERE match_id=$1
-  `, [matchId]);
-
-  const { a, d, b } = sumsRes.rows[0];
-
-  const baseOdds = {
-    oddsA: match.oddsa,
-    oddsD: match.oddsd,
-    oddsB: match.oddsb
-  };
-
-  const o = calculateOdds(a, d, b, baseOdds);
-
-  await pool.query(
-    "UPDATE matches SET oddsa=$1, oddsd=$2, oddsb=$3 WHERE id=$4",
-    [o.oddsA, o.oddsD, o.oddsB, matchId]
-  );
+  // ❌ NIE ZMIENIAMY JUŻ KURSÓW
 
   res.json({ ok: true });
 });
