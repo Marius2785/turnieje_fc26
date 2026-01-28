@@ -305,6 +305,18 @@ app.post("/api/admin/deleteUser", admin, async (req, res) => {
   res.json({ ok: true });
 });
 
+/* ======= 🏆 RANKING TOP 10 ======= */
+
+app.get("/api/ranking", async (req, res) => {
+  const { rows } = await pool.query(`
+    SELECT login, balance
+    FROM users
+    ORDER BY balance DESC
+    LIMIT 10
+  `);
+  res.json(rows);
+});
+
 /* ================= START ================= */
 
 app.listen(process.env.PORT || 3000, () =>
