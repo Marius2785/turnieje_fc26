@@ -16,9 +16,19 @@ h1 {
   margin-top: 30px;
 }
 
-.container {
-  max-width: 1100px;
+.layout {
+  display: flex;
+  gap: 20px;
+  max-width: 1300px;
   margin: 40px auto;
+}
+
+.left-panel {
+  width: 260px;
+}
+
+.main-panel {
+  flex: 1;
 }
 
 .card {
@@ -98,6 +108,7 @@ button.yellow { background:#ffb703; color:#000 }
   display:flex;
   justify-content:space-between;
   margin-bottom:6px;
+  font-size:14px;
 }
 
 footer {
@@ -114,38 +125,52 @@ footer {
 
 <h1>Turnieje FC 26</h1>
 
-<div class="container">
+<div class="layout">
 
-  <!-- LOGOWANIE -->
-  <div id="auth" class="card">
-    <h2>Logowanie</h2>
-    <input id="login" placeholder="login">
-    <input id="password" type="password" placeholder="hasło">
-    <button onclick="doLogin()">Zaloguj</button>
+  <!-- LEWA STRONA -->
+  <div class="left-panel">
 
-    <h3>Rejestracja</h3>
-    <input id="rlogin" placeholder="login">
-    <input id="rpassword" type="password" placeholder="hasło">
-    <button onclick="doRegister()">Zarejestruj</button>
-
-    <p id="msg"></p>
-  </div>
-
-  <!-- PANEL -->
-  <div id="panel" style="display:none">
-
-    <div class="card">
-      <span id="me"></span>
-      <button class="gray" onclick="logout()">Wyloguj</button>
+    <div id="rankingBox" class="card" style="display:none">
+      <h3>🏆 Ranking Top 10</h3>
+      <div id="ranking"></div>
     </div>
 
-    <div id="matches"></div>
+  </div>
 
-    <div id="ranking"></div>
+  <!-- ŚRODEK -->
+  <div class="main-panel">
 
-    <div id="admin"></div>
+    <!-- LOGOWANIE -->
+    <div id="auth" class="card">
+      <h2>Logowanie</h2>
+      <input id="login" placeholder="login">
+      <input id="password" type="password" placeholder="hasło">
+      <button onclick="doLogin()">Zaloguj</button>
+
+      <h3>Rejestracja</h3>
+      <input id="rlogin" placeholder="login">
+      <input id="rpassword" type="password" placeholder="hasło">
+      <button onclick="doRegister()">Zarejestruj</button>
+
+      <p id="msg"></p>
+    </div>
+
+    <!-- PANEL -->
+    <div id="panel" style="display:none">
+
+      <div class="card">
+        <span id="me"></span>
+        <button class="gray" onclick="logout()">Wyloguj</button>
+      </div>
+
+      <div id="matches"></div>
+
+      <div id="admin"></div>
+
+    </div>
 
   </div>
+
 </div>
 
 <footer>by chomiczekk_</footer>
@@ -190,14 +215,18 @@ async function load(){
   if(!me.logged){
     auth.style.display="block";
     panel.style.display="none";
+    rankingBox.style.display="none";
     return;
   }
 
   auth.style.display="none";
   panel.style.display="block";
+  rankingBox.style.display="block";
 
   document.getElementById("me").innerText =
     me.login+" | Saldo: "+me.balance+" 💰";
+
+  loadRanking();
 
   const bettingStatus = await fetch("/api/bettingStatus").then(r=>r.json());
 
@@ -236,8 +265,6 @@ async function load(){
       `;
     }).join("");
 
-  loadRanking();
-
   if(me.admin){
     admin.innerHTML = `
       <div class="card">
@@ -266,6 +293,21 @@ async function load(){
     updateBetToggleButton();
   }
 }
+
+/* ===== RANKING ===== */
+
+async function loadRanking(){
+  const r = await fetch("/api/ranking").then(r=>r.json());
+  document.getElementById("ranking").innerHTML =
+    r.map((u,i)=>`
+      <div class="rank-row">
+        <span>${i+1}. ${u.login}</span>
+        <b>${u.balance} 💰</b>
+      </div>
+    `).join("");
+}
+
+/* ===== BET ===== */
 
 async function bet(id,pick){
   const amount = prompt("Kwota");
@@ -395,23 +437,6 @@ async function deleteUser(id){
   await api("/api/admin/deleteUser",{userId:id});
   alert("Konto usunięte");
   load();
-}
-
-/* ===== 🏆 RANKING ===== */
-
-async function loadRanking(){
-  const users = await fetch("/api/ranking").then(r=>r.json());
-  document.getElementById("ranking").innerHTML = `
-    <div class="card">
-      <h3>🏆 Top 10 graczy</h3>
-      ${users.map((u,i)=>`
-        <div class="rank-row">
-          <b>#${i+1} ${u.login}</b>
-          <span>${u.balance} 💰</span>
-        </div>
-      `).join("")}
-    </div>
-  `;
 }
 
 load();
