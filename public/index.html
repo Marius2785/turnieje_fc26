@@ -94,6 +94,12 @@ button.yellow { background:#ffb703; color:#000 }
   font-size: 13px;
 }
 
+.rank-row {
+  display:flex;
+  justify-content:space-between;
+  margin-bottom:6px;
+}
+
 footer {
   position: fixed;
   left: 10px;
@@ -134,6 +140,8 @@ footer {
     </div>
 
     <div id="matches"></div>
+
+    <div id="ranking"></div>
 
     <div id="admin"></div>
 
@@ -227,6 +235,8 @@ async function load(){
         </div>
       `;
     }).join("");
+
+  loadRanking();
 
   if(me.admin){
     admin.innerHTML = `
@@ -385,6 +395,23 @@ async function deleteUser(id){
   await api("/api/admin/deleteUser",{userId:id});
   alert("Konto usunięte");
   load();
+}
+
+/* ===== 🏆 RANKING ===== */
+
+async function loadRanking(){
+  const users = await fetch("/api/ranking").then(r=>r.json());
+  document.getElementById("ranking").innerHTML = `
+    <div class="card">
+      <h3>🏆 Top 10 graczy</h3>
+      ${users.map((u,i)=>`
+        <div class="rank-row">
+          <b>#${i+1} ${u.login}</b>
+          <span>${u.balance} 💰</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 load();
