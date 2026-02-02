@@ -90,18 +90,6 @@ app.get("/api/matches", async (req, res) => {
   res.json(rows);
 });
 
-/* ================= RANKING TOP 10 ================= */
-
-app.get("/api/ranking", async (req, res) => {
-  const { rows } = await pool.query(`
-    SELECT login, balance
-    FROM users
-    ORDER BY balance DESC
-    LIMIT 10
-  `);
-  res.json(rows);
-});
-
 /* ================= SETTINGS ================= */
 
 async function getBettingOpen() {
@@ -165,6 +153,8 @@ app.post("/api/bet", async (req, res) => {
   );
 
   req.session.user.balance -= stake;
+
+  // ❌ NIE ZMIENIAMY JUŻ KURSÓW
 
   res.json({ ok: true });
 });
