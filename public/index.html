@@ -3,141 +3,48 @@
 <head>
 <meta charset="UTF-8">
 <title>Turnieje FC 26</title>
-<style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: radial-gradient(circle at top, #0f2a3a, #08151f);
-  color: #ff9808;
-}
-
-h1 {
-  text-align: center;
-  margin-top: 30px;
-}
-
-.container {
-  max-width: 1100px;
-  margin: 40px auto;
-}
-
-.card {
-  background: rgba(255,255,255,0.06);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-}
-
-input, button {
-  width: 100%;
-  padding: 10px;
-  margin: 6px 0;
-  border-radius: 6px;
-  border: none;
-  font-size: 14px;
-}
-
-input {
-  background: #0c1f2c;
-  color: #fff;
-}
-
-button {
-  cursor: pointer;
-  background: #2d6cdf;
-  color: #fff;
-  font-weight: bold;
-}
-
-button.green { background:#28c76f }
-button.red { background:#ea5455 }
-button.gray { background:#777 }
-button.yellow { background:#ffb703; color:#000 }
-
-.match {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.match b {
-  font-size: 16px;
-}
-
-.odds button {
-  width: auto;
-  margin-right: 6px;
-}
-
-.admin-actions button {
-  width: 40px;
-  margin-top: 6px;
-  margin-right: 4px;
-}
-
-.user-row {
-  display:flex;
-  gap:6px;
-  align-items:center;
-  margin-bottom:6px;
-}
-
-.user-row input {
-  width:90px;
-}
-
-.bets-box {
-  margin-top: 10px;
-  background: rgba(0,0,0,0.25);
-  padding: 10px;
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-footer {
-  position: fixed;
-  left: 10px;
-  bottom: 6px;
-  font-size: 11px;
-  opacity: 0.6;
-}
-</style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<h1>Turnieje FC 26</h1>
+<header class="topbar">
+  <div class="logo">⚽ Turnieje FC 26</div>
+  <div id="top-user"></div>
+</header>
 
-<div class="container">
+<div class="layout">
 
-  <!-- LOGOWANIE -->
-  <div id="auth" class="card">
-    <h2>Logowanie</h2>
-    <input id="login" placeholder="login">
-    <input id="password" type="password" placeholder="hasło">
-    <button onclick="doLogin()">Zaloguj</button>
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div id="sidebar-auth" class="sidebar-box">
+      <h3>Logowanie</h3>
+      <input id="login" placeholder="login">
+      <input id="password" type="password" placeholder="hasło">
+      <button onclick="doLogin()">Zaloguj</button>
 
-    <h3>Rejestracja</h3>
-    <input id="rlogin" placeholder="login">
-    <input id="rpassword" type="password" placeholder="hasło">
-    <button onclick="doRegister()">Zarejestruj</button>
+      <h4>Rejestracja</h4>
+      <input id="rlogin" placeholder="login">
+      <input id="rpassword" type="password" placeholder="hasło">
+      <button class="secondary" onclick="doRegister()">Zarejestruj</button>
 
-    <p id="msg"></p>
-  </div>
-
-  <!-- PANEL -->
-  <div id="panel" style="display:none">
-
-    <div class="card">
-      <span id="me"></span>
-      <button class="gray" onclick="logout()">Wyloguj</button>
+      <p id="msg"></p>
     </div>
 
-    <div id="matches"></div>
+    <div id="sidebar-user" class="sidebar-box" style="display:none">
+      <div id="me"></div>
+      <button class="secondary" onclick="logout()">Wyloguj</button>
+    </div>
 
     <div id="admin"></div>
+  </aside>
 
-  </div>
+  <!-- MAIN -->
+  <main class="content">
+    <div id="matches" class="matches-grid"></div>
+  </main>
+
 </div>
 
 <footer>by chomiczekk_</footer>
@@ -180,22 +87,28 @@ async function load(){
   const me = await fetch("/api/me").then(r=>r.json());
 
   if(!me.logged){
-    auth.style.display="block";
-    panel.style.display="none";
+    sidebar-auth.style.display="block";
+    sidebar-user.style.display="none";
+    admin.innerHTML="";
+    matches.innerHTML="";
+    document.getElementById("top-user").innerText="";
     return;
   }
 
-  auth.style.display="none";
-  panel.style.display="block";
+  sidebar-auth.style.display="none";
+  sidebar-user.style.display="block";
 
   document.getElementById("me").innerText =
     me.login+" | Saldo: "+me.balance+" 💰";
 
+  document.getElementById("top-user").innerText =
+    me.login+" • "+me.balance+" 💰";
+
   const bettingStatus = await fetch("/api/bettingStatus").then(r=>r.json());
 
-  const matches = await fetch("/api/matches").then(r=>r.json());
+  const matchesData = await fetch("/api/matches").then(r=>r.json());
   document.getElementById("matches").innerHTML =
-    matches.map(m=>{
+    matchesData.map(m=>{
       const oddsA = m.oddsA ?? 2.5;
       const oddsD = m.oddsD ?? 2.5;
       const oddsB = m.oddsB ?? 2.5;
@@ -203,25 +116,36 @@ async function load(){
       const disabled = bettingStatus.open ? "" : "disabled";
 
       return `
-        <div class="card match" onclick="${me.admin ? `toggleBets(${m.id})` : ""}">
-          <div>
-            <b>${m.a} vs ${m.b}</b><br>
-            Status: OTWARTY
+        <div class="match-card" onclick="${me.admin ? `toggleBets(${m.id})` : ""}">
+          <div class="match-header">
+            <span>${m.a}</span>
+            <b>vs</b>
+            <span>${m.b}</span>
           </div>
-          <div class="odds">
-            <button ${disabled} onclick="bet(${m.id},'a');event.stopPropagation()">${m.a} (${oddsA})</button>
-            <button ${disabled} onclick="bet(${m.id},'d');event.stopPropagation()">Remis (${oddsD})</button>
-            <button ${disabled} onclick="bet(${m.id},'b');event.stopPropagation()">${m.b} (${oddsB})</button>
 
-            ${me.admin ? `
-              <div class="admin-actions" onclick="event.stopPropagation()">
-                <button class="green" onclick="finish(${m.id},'a')">1</button>
-                <button class="yellow" onclick="finish(${m.id},'d')">X</button>
-                <button class="red" onclick="finish(${m.id},'b')">2</button>
-                <button class="gray" onclick="cancelMatch(${m.id})">⛔</button>
-              </div>
-            ` : ""}
+          <div class="odds-row">
+            <button ${disabled} onclick="bet(${m.id},'a');event.stopPropagation()">
+              <span>${m.a}</span>
+              <strong>${oddsA}</strong>
+            </button>
+            <button ${disabled} onclick="bet(${m.id},'d');event.stopPropagation()">
+              <span>Remis</span>
+              <strong>${oddsD}</strong>
+            </button>
+            <button ${disabled} onclick="bet(${m.id},'b');event.stopPropagation()">
+              <span>${m.b}</span>
+              <strong>${oddsB}</strong>
+            </button>
           </div>
+
+          ${me.admin ? `
+            <div class="admin-actions" onclick="event.stopPropagation()">
+              <button class="green" onclick="finish(${m.id},'a')">1</button>
+              <button class="yellow" onclick="finish(${m.id},'d')">X</button>
+              <button class="red" onclick="finish(${m.id},'b')">2</button>
+              <button class="gray" onclick="cancelMatch(${m.id})">⛔</button>
+            </div>
+          ` : ""}
 
           ${me.admin ? `<div id="bets-${m.id}" class="bets-box" style="display:none"></div>` : ""}
         </div>
@@ -230,23 +154,23 @@ async function load(){
 
   if(me.admin){
     admin.innerHTML = `
-      <div class="card">
+      <div class="sidebar-box">
         <h3>Panel admina</h3>
         <input id="a" placeholder="Gracz A">
         <input id="b" placeholder="Gracz B">
-        <input id="oddsA" placeholder="Kurs A (np 2.1)">
-        <input id="oddsD" placeholder="Kurs X (np 3.0)">
-        <input id="oddsB" placeholder="Kurs B (np 1.8)">
+        <input id="oddsA" placeholder="Kurs A">
+        <input id="oddsD" placeholder="Kurs X">
+        <input id="oddsB" placeholder="Kurs B">
         <button onclick="addMatch()">Dodaj mecz</button>
         <button id="betToggleBtn" class="yellow" onclick="toggleBetting()">...</button>
       </div>
 
-      <div class="card">
+      <div class="sidebar-box">
         <h3>Oczekujące konta</h3>
         <div id="pending"></div>
       </div>
 
-      <div class="card">
+      <div class="sidebar-box">
         <h3>Użytkownicy</h3>
         <div id="users"></div>
       </div>
@@ -345,7 +269,7 @@ async function loadPending(){
     users.length === 0 ? "Brak" :
     users.map(u=>`
       <div class="user-row">
-        <b>${u.login}</b>
+        <span>${u.login}</span>
         <button class="green" onclick="approveUser(${u.id})">✔</button>
         <button class="red" onclick="deleteUser(${u.id})">✖</button>
       </div>
@@ -365,7 +289,7 @@ async function loadUsers(){
   document.getElementById("users").innerHTML =
     users.map(u=>`
       <div class="user-row">
-        <b>${u.login}</b>
+        <span>${u.login}</span>
         <input type="number" value="${u.balance}" id="bal-${u.id}">
         <button class="green" onclick="saveBalance(${u.id})">💾</button>
         <button class="red" onclick="deleteUser(${u.id})">🗑</button>
