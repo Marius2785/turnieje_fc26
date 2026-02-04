@@ -154,9 +154,34 @@ app.post("/api/bet", async (req, res) => {
 
   req.session.user.balance -= stake;
 
-  // ❌ NIE ZMIENIAMY JUŻ KURSÓW
-
   res.json({ ok: true });
+});
+
+/* ================= 🆕 MOJE ZAKŁADY ================= */
+
+app.get("/api/myBets", async (req, res) => {
+  if (!req.session.user)
+    return res.json([]);
+
+  const { rows } = await pool.query(`
+    SELECT 
+      b.id,
+      m.a,
+      m.b,
+      b.pick,
+      b.amount,
+      CASE 
+        WHEN b.pick='a' THEN m.oddsa
+        WHEN b.pick='d' THEN m.oddsd
+        ELSE m.oddsb
+      END AS odds
+    FROM bets b
+    JOIN matches m ON m.id = b.match_id
+    WHERE b.user_id=$1 AND m.status='open'
+    ORDER BY b.id DESC
+  `, [req.session.user.id]);
+
+  res.json(rows);
 });
 
 /* ================= ADMIN ================= */
@@ -243,7 +268,7 @@ app.post("/api/admin/cancel", admin, async (req, res) => {
   res.json({ ok: true });
 });
 
-/* ======= 🆕 ADMIN — BETY NA MECZ ======= */
+/* ======= ADMIN — BETY NA MECZ ======= */
 
 app.get("/api/admin/matchBets/:id", admin, async (req, res) => {
   const { id } = req.params;
