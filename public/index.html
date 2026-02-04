@@ -86,28 +86,34 @@ async function logout(){
 async function load(){
   const me = await fetch("/api/me").then(r=>r.json());
 
+  const authBox = document.getElementById("sidebar-auth");
+  const userBox = document.getElementById("sidebar-user");
+  const adminBox = document.getElementById("admin");
+  const matchesBox = document.getElementById("matches");
+  const topUser = document.getElementById("top-user");
+
   if(!me.logged){
-    sidebar-auth.style.display="block";
-    sidebar-user.style.display="none";
-    admin.innerHTML="";
-    matches.innerHTML="";
-    document.getElementById("top-user").innerText="";
+    authBox.style.display="block";
+    userBox.style.display="none";
+    adminBox.innerHTML="";
+    matchesBox.innerHTML="";
+    topUser.innerText="";
     return;
   }
 
-  sidebar-auth.style.display="none";
-  sidebar-user.style.display="block";
+  authBox.style.display="none";
+  userBox.style.display="block";
 
   document.getElementById("me").innerText =
     me.login+" | Saldo: "+me.balance+" 💰";
 
-  document.getElementById("top-user").innerText =
+  topUser.innerText =
     me.login+" • "+me.balance+" 💰";
 
   const bettingStatus = await fetch("/api/bettingStatus").then(r=>r.json());
 
   const matchesData = await fetch("/api/matches").then(r=>r.json());
-  document.getElementById("matches").innerHTML =
+  matchesBox.innerHTML =
     matchesData.map(m=>{
       const oddsA = m.oddsA ?? 2.5;
       const oddsD = m.oddsD ?? 2.5;
@@ -153,7 +159,7 @@ async function load(){
     }).join("");
 
   if(me.admin){
-    admin.innerHTML = `
+    adminBox.innerHTML = `
       <div class="sidebar-box">
         <h3>Panel admina</h3>
         <input id="a" placeholder="Gracz A">
