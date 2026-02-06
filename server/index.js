@@ -177,7 +177,7 @@ app.get("/api/myBets", async (req, res) => {
       END AS odds
     FROM bets b
     JOIN matches m ON m.id = b.match_id
-    WHERE b.user_id=$1 AND m.status='open'
+    WHERE b.user_id = $1
     ORDER BY b.id DESC
   `, [req.session.user.id]);
 
