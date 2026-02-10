@@ -1,1 +1,354 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Turnieje FC 26</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
 
+<body>
+
+<header class="topbar">
+  <div class="logo">⚽ Turnieje FC 26</div>
+  <div id="top-user"></div>
+</header>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div id="sidebar-auth" class="sidebar-box">
+      <h3>Logowanie</h3>
+      <input id="login" placeholder="login">
+      <input id="password" type="password" placeholder="hasło">
+      <button onclick="doLogin()">Zaloguj</button>
+
+      <h4>Rejestracja</h4>
+      <input id="rlogin" placeholder="login">
+      <input id="rpassword" type="password" placeholder="hasło">
+      <button class="secondary" onclick="doRegister()">Zarejestruj</button>
+
+      <p id="msg"></p>
+    </div>
+
+    <div id="sidebar-user" class="sidebar-box" style="display:none">
+      <div id="me"></div>
+
+      <h4>Moje zakłady</h4>
+      <div id="my-bets">Brak</div>
+
+      <button class="secondary" onclick="logout()">Wyloguj</button>
+    </div>
+
+    <div id="admin"></div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="content">
+    <div id="matches" class="matches-grid"></div>
+  </main>
+
+</div>
+
+<footer>by chomiczekk_</footer>
+
+<script>
+const msg = document.getElementById("msg");
+
+async function api(url, data) {
+  const r = await fetch(url,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(data)
+  });
+  return r.json();
+}
+
+async function doLogin(){
+  const r = await api("/api/login",{
+    login:login.value,
+    password:password.value
+  });
+  if(r.error) msg.innerText = r.error;
+  else load();
+}
+
+async function doRegister(){
+  const r = await api("/api/register",{
+    login:rlogin.value,
+    password:rpassword.value
+  });
+  msg.innerText = r.error || "Zarejestrowano — konto czeka na akceptację";
+}
+
+async function logout(){
+  await api("/api/logout",{});
+  load();
+}
+
+async function load(){
+  const me = await fetch("/api/me").then(r=>r.json());
+
+  const authBox = document.getElementById("sidebar-auth");
+  const userBox = document.getElementById("sidebar-user");
+  const adminBox = document.getElementById("admin");
+  const matchesBox = document.getElementById("matches");
+  const topUser = document.getElementById("top-user");
+
+  if(!me.logged){
+    authBox.style.display="block";
+    userBox.style.display="none";
+    adminBox.innerHTML="";
+    matchesBox.innerHTML="";
+    topUser.innerText="";
+    return;
+  }
+
+  authBox.style.display="none";
+  userBox.style.display="block";
+
+  document.getElementById("me").innerText =
+    me.login+" | Saldo: "+me.balance+" 💰";
+
+  topUser.innerText =
+    me.login+" • "+me.balance+" 💰";
+
+  await loadMyBets();
+
+  const bettingStatus = await fetch("/api/bettingStatus").then(r=>r.json());
+
+  const matchesData = await fetch("/api/matches").then(r=>r.json());
+  matchesBox.innerHTML =
+    matchesData.map(m=>{
+      const oddsA = m.oddsA ?? 2.5;
+      const oddsD = m.oddsD ?? 2.5;
+      const oddsB = m.oddsB ?? 2.5;
+
+      const disabled = bettingStatus.open ? "" : "disabled";
+
+      return `
+        <div class="match-card" onclick="${me.admin ? `toggleBets(${m.id})` : ""}">
+          <div class="match-header">
+            <span>${m.a}</span>
+            <b>vs</b>
+            <span>${m.b}</span>
+          </div>
+
+          <div class="odds-row">
+            <button ${disabled} onclick="bet(${m.id},'a');event.stopPropagation()">
+              <span>${m.a}</span>
+              <strong>${oddsA}</strong>
+            </button>
+            <button ${disabled} onclick="bet(${m.id},'d');event.stopPropagation()">
+              <span>Remis</span>
+              <strong>${oddsD}</strong>
+            </button>
+            <button ${disabled} onclick="bet(${m.id},'b');event.stopPropagation()">
+              <span>${m.b}</span>
+              <strong>${oddsB}</strong>
+            </button>
+          </div>
+
+          ${me.admin ? `
+            <div class="admin-actions" onclick="event.stopPropagation()">
+              <button class="green" onclick="finish(${m.id},'a')">1</button>
+              <button class="yellow" onclick="finish(${m.id},'d')">X</button>
+              <button class="red" onclick="finish(${m.id},'b')">2</button>
+              <button class="gray" onclick="cancelMatch(${m.id})">⛔</button>
+            </div>
+          ` : ""}
+
+          ${me.admin ? `<div id="bets-${m.id}" class="bets-box" style="display:none"></div>` : ""}
+        </div>
+      `;
+    }).join("");
+
+  if(me.admin){
+    adminBox.innerHTML = `
+      <div class="sidebar-box">
+        <h3>Panel admina</h3>
+        <input id="a" placeholder="Gracz A">
+        <input id="b" placeholder="Gracz B">
+        <input id="oddsA" placeholder="Kurs A">
+        <input id="oddsD" placeholder="Kurs X">
+        <input id="oddsB" placeholder="Kurs B">
+        <button onclick="addMatch()">Dodaj mecz</button>
+        <button id="betToggleBtn" class="yellow" onclick="toggleBetting()">...</button>
+      </div>
+
+      <div class="sidebar-box">
+        <h3>Oczekujące konta</h3>
+        <div id="pending"></div>
+      </div>
+
+      <div class="sidebar-box">
+        <h3>Użytkownicy</h3>
+        <div id="users"></div>
+      </div>
+    `;
+    loadUsers();
+    loadPending();
+    updateBetToggleButton();
+  }
+}
+
+async function loadMyBets(){
+  const bets = await fetch("/api/myBets").then(r=>r.json());
+  const box = document.getElementById("my-bets");
+  if(!box) return;
+
+  if(!bets.length){
+    box.innerText = "Brak aktywnych zakładów";
+    return;
+  }
+
+  box.innerHTML = bets.map(b=>{
+    const pick =
+      b.pick === "a" ? "1" :
+      b.pick === "d" ? "X" : "2";
+
+    return `
+      <div class="bet-row">
+        ${b.a} vs ${b.b}<br>
+        <small>${pick} • ${b.amount} 💰 • x${b.odds}</small>
+      </div>
+    `;
+  }).join("");
+}
+
+async function bet(id,pick){
+  const amount = prompt("Kwota");
+  if(!amount) return;
+  const r = await api("/api/bet",{matchId:id,pick,amount:+amount});
+  if(r.error) alert(r.error);
+  load();
+}
+
+async function addMatch(){
+  await api("/api/admin/match",{
+    a:a.value,
+    b:b.value,
+    oddsA: oddsA.value,
+    oddsD: oddsD.value,
+    oddsB: oddsB.value
+  });
+  load();
+}
+
+async function finish(id,result){
+  if(!confirm("Na pewno zakończyć mecz?")) return;
+  const r = await api("/api/admin/finish",{id,result});
+  if(r.error) alert(r.error);
+  else alert("Mecz zakończony — wypłaty rozdane");
+  load();
+}
+
+async function cancelMatch(id){
+  if(!confirm("Na pewno anulować mecz?")) return;
+  await api("/api/admin/cancel",{id});
+  alert("Mecz anulowany — stawki zwrócone");
+  load();
+}
+
+/* ===== ADMIN — BETY NA MECZ ===== */
+
+async function toggleBets(matchId){
+  const box = document.getElementById("bets-"+matchId);
+  if(!box) return;
+
+  if(box.style.display === "block"){
+    box.style.display = "none";
+    return;
+  }
+
+  const bets = await fetch("/api/admin/matchBets/"+matchId).then(r=>r.json());
+
+  if(bets.length === 0){
+    box.innerHTML = "Brak zakładów";
+  } else {
+    box.innerHTML = bets.map(b=>
+      `• ${b.login} — ${b.pick.toUpperCase()} — ${b.amount} 💰`
+    ).join("<br>");
+  }
+
+  box.style.display = "block";
+}
+
+/* ===== ADMIN — BLOKADA OBSTAWIANIA ===== */
+
+async function updateBetToggleButton(){
+  const r = await fetch("/api/bettingStatus").then(r=>r.json());
+  const btn = document.getElementById("betToggleBtn");
+  if(!btn) return;
+
+  if(r.open){
+    btn.innerText = "🔒 Zablokuj obstawianie";
+    btn.className = "red";
+  } else {
+    btn.innerText = "🔓 Odblokuj obstawianie";
+    btn.className = "green";
+  }
+}
+
+async function toggleBetting(){
+  await api("/api/admin/toggleBetting",{});
+  updateBetToggleButton();
+  load();
+}
+
+/* ===== ADMIN — OCZEKUJĄCE KONTA ===== */
+
+async function loadPending(){
+  const users = await fetch("/api/admin/pendingUsers").then(r=>r.json());
+  document.getElementById("pending").innerHTML =
+    users.length === 0 ? "Brak" :
+    users.map(u=>`
+      <div class="user-row">
+        <span>${u.login}</span>
+        <button class="green" onclick="approveUser(${u.id})">✔</button>
+        <button class="red" onclick="deleteUser(${u.id})">✖</button>
+      </div>
+    `).join("");
+}
+
+async function approveUser(id){
+  await api("/api/admin/approveUser",{userId:id});
+  alert("Konto zaakceptowane");
+  load();
+}
+
+/* ===== ADMIN — UŻYTKOWNICY ===== */
+
+async function loadUsers(){
+  const users = await fetch("/api/admin/users").then(r=>r.json());
+  document.getElementById("users").innerHTML =
+    users.map(u=>`
+      <div class="user-row">
+        <span>${u.login}</span>
+        <input type="number" value="${u.balance}" id="bal-${u.id}">
+        <button class="green" onclick="saveBalance(${u.id})">💾</button>
+        <button class="red" onclick="deleteUser(${u.id})">🗑</button>
+      </div>
+    `).join("");
+}
+
+async function saveBalance(id){
+  const v = document.getElementById("bal-"+id).value;
+  await api("/api/admin/balance",{userId:id,balance:+v});
+  alert("Saldo zapisane");
+  load();
+}
+
+async function deleteUser(id){
+  if(!confirm("Na pewno usunąć konto?")) return;
+  await api("/api/admin/deleteUser",{userId:id});
+  alert("Konto usunięte");
+  load();
+}
+
+load();
+</script>
+
+</body>
+</html>
